@@ -1,0 +1,17 @@
+# Normalise text in the repository, and force LF on anything a Linux runner
+# executes. A shell script checked out with CRLF fails on the runner with an
+# error about \r that points nowhere near the real cause.
+* text=auto
+
+*.sh      text eol=lf
+gradlew   text eol=lf
+*.yml     text eol=lf
+*.yaml    text eol=lf
+
+*.png     binary
+*.jpg     binary
+*.mp3     binary
+*.onnx    binary
+*.tflite  binary
+*.ttf     binary
+*.wav     binary

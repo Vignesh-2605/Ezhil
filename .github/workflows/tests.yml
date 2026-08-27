@@ -47,6 +47,16 @@ jobs:
           OCR_ENGINE: paddle
         run: |
           cp .env.example .env 2>/dev/null || true
+          # .env.example ships SECRET_KEY=change-me-... on purpose, and the
+          # deployment assertions correctly flag that as a placeholder. Put a
+          # real generated value in so the check is exercised rather than
+          # failing on a template.
+          python - <<'PY'
+          import pathlib, re, secrets
+          p = pathlib.Path('.env')
+          p.write_text(re.sub(r'(?m)^SECRET_KEY=.*$',
+                              'SECRET_KEY=' + secrets.token_hex(32), p.read_text()))
+          PY
           # Every suite authenticates as the demo teacher or student. Without
           # this the database is empty and they all die at "Invalid credentials".
           python seed.py
@@ -103,6 +113,16 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           cp .env.example .env 2>/dev/null || true
+          # .env.example ships SECRET_KEY=change-me-... on purpose, and the
+          # deployment assertions correctly flag that as a placeholder. Put a
+          # real generated value in so the check is exercised rather than
+          # failing on a template.
+          python - <<'PY'
+          import pathlib, re, secrets
+          p = pathlib.Path('.env')
+          p.write_text(re.sub(r'(?m)^SECRET_KEY=.*$',
+                              'SECRET_KEY=' + secrets.token_hex(32), p.read_text()))
+          PY
           # Every suite authenticates as the demo teacher or student. Without
           # this the database is empty and they all die at "Invalid credentials".
           python seed.py
@@ -158,6 +178,16 @@ jobs:
           SECRET_KEY: ci-secret-key-not-used-outside-ci
         run: |
           cp .env.example .env 2>/dev/null || true
+          # .env.example ships SECRET_KEY=change-me-... on purpose, and the
+          # deployment assertions correctly flag that as a placeholder. Put a
+          # real generated value in so the check is exercised rather than
+          # failing on a template.
+          python - <<'PY'
+          import pathlib, re, secrets
+          p = pathlib.Path('.env')
+          p.write_text(re.sub(r'(?m)^SECRET_KEY=.*$',
+                              'SECRET_KEY=' + secrets.token_hex(32), p.read_text()))
+          PY
           # Every suite authenticates as the demo teacher or student. Without
           # this the database is empty and they all die at "Invalid credentials".
           python seed.py
@@ -227,24 +257,19 @@ jobs:
 
       - name: On-device suite
         uses: reactivecircus/android-emulator-runner@v2
+        # The action runs each line of `script:` as its own `sh -c`, so no
+        # variable set on one line survives to the next. Everything the suite
+        # needs is passed as step env, and the logic lives in one file.
+        env:
+          APK_PATH: ${{ github.workspace }}/ezhil-android/app/build/outputs/apk/debug/app-x86_64-debug.apk
+          APPIUM_URL: http://127.0.0.1:4723
         with:
           api-level: 29
           target: default
           arch: x86_64
           profile: Nexus 6
           disable-animations: true
-          script: |
-            appium --log-level warn > /tmp/appium.log 2>&1 &
-            for i in $(seq 1 40); do curl -sf http://127.0.0.1:4723/status && break || sleep 2; done
-            curl -sf http://127.0.0.1:4723/status || { echo "appium never started"; cat /tmp/appium.log; exit 1; }
-            cd ezhil-tests
-            # The env-prefix-with-continuation form is not valid in the
-            # runner shell, which reported: /usr/bin/sh: 1: \: not found
-            export APK_PATH="$GITHUB_WORKSPACE/ezhil-android/app/build/outputs/apk/debug/app-x86_64-debug.apk"
-            export APPIUM_URL=http://127.0.0.1:4723
-            ls -la "$APK_PATH" || { echo "no x86_64 APK was built"; exit 1; }
-            adb wait-for-device
-            node suites/android-appium.js
+          script: bash ezhil-tests/scripts/ci-appium.sh
 
       - name: Appium log on failure
         if: failure()
@@ -275,7 +300,11 @@ jobs:
         run: |
           npm --prefix ezhil-web ci
           npm --prefix ezhil-web run build
-          cd ezhil-android && chmod +x ./gradlew && ./gradlew assembleDebug --no-daemon
+          cd ezhil-android && chmod +x ./gradlew
+          # The suite asserts on the release bundle too, so it has to exist.
+          # It builds unsigned here: no keystore is present on a runner, and
+          # the signing config is skipped when the keystore is absent.
+          ./gradlew assembleDebug bundleRelease --no-daemon
 
       - name: Start backend
         working-directory: ezhil-backend
@@ -285,6 +314,16 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           cp .env.example .env 2>/dev/null || true
+          # .env.example ships SECRET_KEY=change-me-... on purpose, and the
+          # deployment assertions correctly flag that as a placeholder. Put a
+          # real generated value in so the check is exercised rather than
+          # failing on a template.
+          python - <<'PY'
+          import pathlib, re, secrets
+          p = pathlib.Path('.env')
+          p.write_text(re.sub(r'(?m)^SECRET_KEY=.*$',
+                              'SECRET_KEY=' + secrets.token_hex(32), p.read_text()))
+          PY
           # Every suite authenticates as the demo teacher or student. Without
           # this the database is empty and they all die at "Invalid credentials".
           python seed.py
