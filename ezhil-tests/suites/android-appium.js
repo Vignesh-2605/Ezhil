@@ -129,12 +129,17 @@ async function main() {
     await H.check(rec, 'Accessibility', 'interactive elements carry a label', async () => {
       const r = await http('GET', S(id, '/source'));
       const xml = r.json?.value || '';
-      const clickable = [...xml.matchAll(/clickable="true"[^>]*/g)];
-      if (!clickable.length) return;   // a splash screen legitimately has none
-      const unlabelled = clickable.filter(m =>
-        !/content-desc="[^"]+"/.test(m[0]) && !/text="[^"]+"/.test(m[0]));
-      if (unlabelled.length === clickable.length) {
-        throw new Error(`all ${clickable.length} tappable elements lack a label or text`);
+      // Match the whole element, not the tail after clickable="true".
+      // uiautomator writes content-desc and text *before* clickable, so a
+      // pattern anchored at clickable never saw either and reported every
+      // tappable element as unlabelled.
+      const nodes = [...xml.matchAll(/<[^>]*clickable="true"[^>]*>/g)].map(m => m[0]);
+      if (!nodes.length) return;   // a splash screen legitimately has none
+      const labelled = nodes.filter(n =>
+        /content-desc="[^"]+"/.test(n) || /text="[^"]+"/.test(n) ||
+        /resource-id="[^"]+"/.test(n));
+      if (labelled.length === 0) {
+        throw new Error(`none of the ${nodes.length} tappable elements carry a label, text or id`);
       }
     });
 

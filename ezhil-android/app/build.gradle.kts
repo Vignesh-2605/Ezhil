@@ -80,7 +80,10 @@ android {
     // too, for when the target device is unknown.
     splits {
         abi {
-            isEnable = true
+            // AGP refuses to build an app bundle while multiple APKs are being
+            // built (issuetracker 402800800), so bundleRelease is run with
+            // -PezhilNoSplits=true. Nothing about a normal build changes.
+            isEnable = project.findProperty("ezhilNoSplits") != "true"
             reset()
             // The two ABIs a classroom handset actually uses. CI adds x86_64
             // with -PezhilExtraAbi=x86_64 so the emulator has something it can

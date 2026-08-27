@@ -301,10 +301,12 @@ jobs:
           npm --prefix ezhil-web ci
           npm --prefix ezhil-web run build
           cd ezhil-android && chmod +x ./gradlew
-          # The suite asserts on the release bundle too, so it has to exist.
-          # It builds unsigned here: no keystore is present on a runner, and
-          # the signing config is skipped when the keystore is absent.
-          ./gradlew assembleDebug bundleRelease --no-daemon
+          ./gradlew assembleDebug --no-daemon
+          # Separate invocation: AGP refuses to build a bundle while multiple
+          # APKs are being built (issuetracker 402800800), so splits are turned
+          # off for this one. Unsigned, since no keystore exists on a runner and
+          # the signing config is skipped when it is absent.
+          ./gradlew bundleRelease --no-daemon -PezhilNoSplits=true
 
       - name: Start backend
         working-directory: ezhil-backend
