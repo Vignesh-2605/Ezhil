@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug builds only — this file never ships.
+
+  Development runs the backend on a laptop on the classroom Wi-Fi over plain
+  HTTP, and its address changes with the network, so cleartext is permitted
+  broadly here. Android's network security config matches DNS names, not CIDR
+  ranges, so there is no way to say "private addresses only" — listing
+  192.168.0.0 would match nothing.
+
+  The release build uses app/src/main/res/xml/network_security_config.xml,
+  which permits no cleartext at all. That is the one that reaches a school.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <!-- Lets a proxy such as Charles inspect debug traffic. -->
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

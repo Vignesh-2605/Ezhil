@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+ezhil.db
+test_ezhil.db
+.env
+!.env.example
+*.log
+uploads/
+.DS_Store
+
+# Manual API-probe leftovers from development. _tok.txt held a live JWT, so
+# these are ignored rather than tidied away by hand and re-created later.
+/_*.json
+/_*.txt
+/_*.png

@@ -1,0 +1,37 @@
+# Secrets and machine-local configuration. Never commit these.
+.env
+!.env.example
+local.properties
+*.jks
+*.keystore
+*.pem
+*.p12
+
+# Dependencies and build output
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.pyc
+dist/
+build/
+.gradle/
+*.apk
+*.aab
+
+# Local databases and run output
+*.db
+*.log
+ezhil-tests/reports/*.json
+ezhil-tests/reports/*.xlsx
+ezhil-tests/reports/*.html
+!ezhil-tests/reports/build-report.js
+
+# Model weights are gigabytes; see ezhil-backend/.env.example for expected paths
+models/
+
+# Editor and OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

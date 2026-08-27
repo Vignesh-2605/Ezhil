@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Release builds are HTTPS-only.
+
+  The app previously set android:usesCleartextTraffic="true" on the whole
+  application, so every request — teacher PINs, children's names, screening
+  results — could travel unencrypted to any host. That is also a Play Store
+  rejection for a new app.
+
+  Development still needs plain HTTP against a backend on the local network,
+  so the debug build (see network_security_config_debug.xml) permits cleartext
+  to private address ranges only. This file, used by release, permits none.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

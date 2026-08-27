@@ -1,0 +1,653 @@
+@import "tailwindcss";
+
+@theme {
+  /* ── Backgrounds ── */
+  --color-bg-deep: #0B0C10;
+  --color-bg-surface: #1F2833;
+  --color-bg-student-card: #0E1119;
+  --color-bg-teacher-card: #1A2233;
+  --color-bg-student: #0A1219;
+  --color-bg-reader: #FFFDf5;
+  --color-bg-sidebar: #11151C;
+
+  /* ── Primary / Teal / Cyan ── */
+  --color-primary-fixed: #62F9EE;
+  --color-primary: #62F9EE;
+  --color-primary-container: #62F9EE;
+  --color-primary-fixed-dim: #4DD9CF;
+  --color-on-primary: #00201E;
+  --color-on-primary-container: #00201E;
+  --color-accent-teal: #007774;
+  --color-accent-cyan: #3CDCD1;
+  --color-secondary-container: #007774;
+
+  /* ── Surface containers ── */
+  --color-surface: #111415;
+  --color-surface-dim: #111415;
+  --color-surface-bright: #37393a;
+  --color-surface-container: #1e2021;
+  --color-surface-container-low: #1a1c1d;
+  --color-surface-container-lowest: #0c0f0f;
+  --color-surface-container-high: #282a2b;
+  --color-surface-container-highest: #333536;
+  --color-surface-variant: #333536;
+  --color-outline: #859491;
+  --color-outline-variant: #3c4948;
+
+  /* ── Text ── */
+  --color-on-surface: #e2e2e3;
+  --color-on-surface-variant: #bacac7;
+  --color-text-primary: #E0E0E0;
+  --color-text-muted: #9A9A9A;
+  --color-border-muted: #3D5250;
+  --color-text-on-accent: #0B0C10;
+
+  /* ── Semantic ── */
+  --color-success: #4CAF82;
+  --color-error: #ffb4ab;
+  --color-error-text: #FF6B6B;
+  --color-secondary: #FFB955;
+  --color-studio-purple: #7C3AED;
+  /* Was #4C1D95 — darker than the base purple despite the name, giving
+     1.78:1 against the page background where it is used as icon and label
+     colour. A genuine contrast failure, not a taste call. #A78BFA is
+     actually lighter than the base and reaches 7.18:1. */
+  --color-studio-purple-light: #A78BFA;
+  /* The old dark value is still useful as a fill behind light text. */
+  --color-studio-purple-deep: #4C1D95;
+
+  /* ── Tertiary (warm gold — stars, XP, rewards) ── */
+  --color-tertiary-fixed: #FFD27F;
+  --color-tertiary-fixed-dim: #F5C26B;
+  --color-tertiary: #FFD27F;
+  --color-tertiary-container: #5C4A1F;
+  --color-on-tertiary-container: #FFE0A3;
+  --color-teacher-blue: #3B82F6;
+  --color-teacher-primary: #1A5CA8;
+  --color-brand-marigold: #F5A623;
+
+  /* ── Risk ── */
+  --color-risk-high: #E53935;
+  --color-risk-medium: #FB8C00;
+  --color-risk-low: #43A047;
+  --color-risk-unscreened: #C5C6C7;
+
+  /* ── Fonts ── */
+  --font-display-tamil: "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-body-tamil: "DM Sans", "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-bilingual-sub: "DM Sans", "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-dashboard-title: "DM Sans", "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-mono-metadata: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+  --font-reader-tamil: "Newsreader", Georgia, serif;
+  --font-tamil-body: "Noto Sans Tamil", sans-serif;
+  --font-tamil-reader: "Noto Serif Tamil", serif;
+
+  /* ── Spacing tokens ── */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-xxl: 48px;
+  --spacing-topbar-height: 64px;
+  --spacing-sidebar-fixed: 240px;
+  --spacing-sidebar-collapsed: 72px;
+
+}
+
+@layer base {
+  body {
+    background: radial-gradient(circle at top left, #0D1117 0%, #050608 100%);
+    background-attachment: fixed;
+    position: relative;
+    @apply text-on-surface font-body-tamil min-h-screen antialiased;
+  }
+
+  /* ── Global ambient aurora — drifts subtly behind every page ── */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -2;
+    pointer-events: none;
+    background:
+      radial-gradient(42rem 42rem at 12% 8%, rgba(98, 249, 238, 0.07), transparent 60%),
+      radial-gradient(38rem 38rem at 88% 18%, rgba(124, 58, 237, 0.06), transparent 60%),
+      radial-gradient(46rem 46rem at 78% 92%, rgba(0, 119, 116, 0.07), transparent 60%),
+      radial-gradient(34rem 34rem at 18% 88%, rgba(245, 166, 35, 0.04), transparent 60%);
+    background-size: 200% 200%;
+    animation: aurora-drift 32s ease-in-out infinite;
+  }
+
+  /* ── Faint dot grid for depth ── */
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0.4;
+    background-image: radial-gradient(rgba(133, 148, 145, 0.05) 1px, transparent 1px);
+    background-size: 28px 28px;
+    mask-image: radial-gradient(circle at 50% 40%, black 0%, transparent 85%);
+    -webkit-mask-image: radial-gradient(circle at 50% 40%, black 0%, transparent 85%);
+  }
+
+  ::selection {
+    background: rgba(98, 249, 238, 0.25);
+    color: #ffffff;
+  }
+
+  *:focus-visible {
+    outline: 2px solid rgba(98, 249, 238, 0.6);
+    outline-offset: 2px;
+  }
+
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Custom scrollbar for data-heavy views */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #1a1c1d;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #333536;
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #3c4948;
+  }
+
+  /* Universal tactile press physics: every button squashes on press and
+     springs back with a bouncy easing. Transform-only (GPU-cheap). */
+  button {
+    transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  button:active {
+    transform: scale(0.94);
+    transition-duration: 0.06s;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    button, button:active {
+      transition: none;
+      transform: none;
+    }
+  }
+}
+
+@layer utilities {
+  .material-symbols-outlined {
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    font-family: 'Material Symbols Outlined';
+    font-style: normal;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    display: inline-block;
+    white-space: nowrap;
+    word-wrap: normal;
+    direction: ltr;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .glass-card {
+    position: relative;
+    background:
+      linear-gradient(150deg, rgba(45, 56, 68, 0.55) 0%, rgba(20, 26, 33, 0.45) 100%);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(133, 148, 145, 0.14);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 8px 28px rgba(0, 0, 0, 0.28);
+  }
+
+  .glass-card-hover {
+    @apply transition-all duration-300 hover:bg-bg-surface/60 hover:border-white/20 hover:shadow-[0_12px_40px_rgba(0,0,0,0.4)];
+  }
+
+  .glass-panel {
+    /* One light source, from top-centre: a 1px inner highlight on the top edge,
+       and a shadow tinted with the page hue. Flat black shadows on a teal-black
+       ground read as a sticker pasted on rather than a surface lit from above. */
+    @apply bg-bg-surface/70 backdrop-blur-md border border-white/10;
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.055),
+      0 10px 30px -10px rgb(0 18 22 / 0.55);
+  }
+
+  .glass-panel-heavy {
+    @apply bg-bg-sidebar/90 backdrop-blur-xl border border-white/10 shadow-[0_16px_48px_rgba(0,0,0,0.5)];
+  }
+
+  .hide-scrollbar::-webkit-scrollbar { display: none; }
+  .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+  .text-glow-teal {
+    text-shadow: 0 0 16px rgba(98, 249, 238, 0.5);
+  }
+
+  @keyframes gradient-pan {
+    0%   { background-position: 0% 50%; }
+    50%  { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  .bg-gradient-animated {
+    background-size: 200% 200%;
+    animation: gradient-pan 15s ease infinite;
+  }
+
+  @keyframes pulse-ring {
+    0%   { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(98,249,238,0.4); }
+    70%  { transform: scale(1);    box-shadow: 0 0 0 10px rgba(98,249,238,0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(98,249,238,0); }
+  }
+
+  .animate-pulse-ring { animation: pulse-ring 2s ease-out infinite; }
+
+  @keyframes wave-bar {
+    0%, 100% { height: 6px; }
+    50%       { height: 20px; }
+  }
+
+  .animate-wave-bar { animation: wave-bar 0.8s ease-in-out infinite; }
+
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-6px); }
+    40%, 80% { transform: translateX(6px); }
+  }
+
+  .animate-shake {
+    animation: shake 0.4s ease-in-out;
+  }
+
+  @keyframes slide-in-bottom {
+    0% { transform: translateY(16px); opacity: 0; }
+    100% { transform: translateY(0); opacity: 1; }
+  }
+
+  .animate-slide-in {
+    animation: slide-in-bottom 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  @keyframes fade-in {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+  }
+
+  .animate-fade-in {
+    animation: fade-in 0.4s ease forwards;
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+
+  .animate-float {
+    animation: float 4s ease-in-out infinite;
+  }
+
+  /* ── Tamil Typography & Lead Systems ── */
+  .font-body-tamil {
+    font-family: var(--font-tamil-body), var(--font-body-tamil);
+    line-height: 1.625;
+    letter-spacing: 0.02em;
+    word-break: normal;
+    overflow-wrap: break-word;
+  }
+  .font-reader-tamil {
+    font-family: var(--font-tamil-reader), var(--font-reader-tamil);
+    line-height: 1.75;
+    letter-spacing: 0.03em;
+    word-break: normal;
+    overflow-wrap: break-word;
+  }
+
+  /* ── Layout & Card Alignment ── */
+  .equal-height-grid {
+    display: grid;
+    grid-auto-rows: 1fr;
+  }
+  .pin-card-footer {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 100%;
+  }
+
+  /* ── Global Overflow Safety Utilities ── */
+  .overflow-safe-container {
+    min-width: 0;
+    word-break: break-word;
+    overflow-wrap: break-word;
+  }
+  .word-break-normal {
+    word-break: normal;
+    overflow-wrap: break-word;
+    white-space: normal;
+  }
+  .prevent-layout-break {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .responsive-modal-min {
+    min-width: 280px;
+    max-width: 90vw;
+  }
+
+  /* ────────────────────────────────────────────────────────────
+     FIX: the project's named --spacing-* tokens (xs/sm/md/lg/xl)
+     collide with Tailwind v4's container scale, hijacking the
+     max-w-* utilities so `max-w-lg` resolves to 24px instead of
+     32rem — collapsing content to one character per line.
+     Restore the intended content widths here.
+     ──────────────────────────────────────────────────────────── */
+  .max-w-xs { max-width: 20rem; }
+  .max-w-sm { max-width: 24rem; }
+  .max-w-md { max-width: 28rem; }
+  .max-w-lg { max-width: 32rem; }
+  .max-w-xl { max-width: 36rem; }
+
+  /* ════════════════════════════════════════════════════════════
+     Engagement & creativity layer — reusable across all pages
+     ════════════════════════════════════════════════════════════ */
+
+  /* ── Animated aurora drift (global background) ── */
+  @keyframes aurora-drift {
+    0%   { background-position: 0% 50%, 100% 50%, 50% 100%, 0% 0%; }
+    50%  { background-position: 100% 50%, 0% 50%, 50% 0%, 100% 100%; }
+    100% { background-position: 0% 50%, 100% 50%, 50% 100%, 0% 0%; }
+  }
+
+  /* ── Gradient text (static + animated) ── */
+  .text-gradient-teal {
+    background: linear-gradient(100deg, #62F9EE 0%, #3CDCD1 40%, #62F9EE 80%);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    animation: text-shine 6s linear infinite;
+  }
+  .text-gradient-warm {
+    background: linear-gradient(100deg, #FFB955 0%, #F5A623 50%, #FFD27F 100%);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    animation: text-shine 6s linear infinite;
+  }
+  @keyframes text-shine {
+    to { background-position: 200% center; }
+  }
+
+  /* ── Interactive lift card: hover raises + cyan glow ── */
+  .card-lift {
+    @apply transition-all duration-300 ease-out;
+    will-change: transform;
+  }
+  .card-lift:hover {
+    transform: translateY(-4px);
+    /* Lift keeps the same tinted hue as the resting shadow, just deeper — a
+       card moving toward the viewer does not change what colour the room is. */
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.07),
+      0 20px 46px -14px rgb(0 18 22 / 0.7),
+      0 0 0 1px rgb(98 249 238 / 0.16);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .card-lift:hover { transform: none; }
+  }
+
+  /* ── Shimmer sweep overlay (place inside a relative, overflow-hidden el) ── */
+  .shimmer::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.08) 50%, transparent 70%);
+    transform: translateX(-100%);
+    animation: shimmer-sweep 3.5s ease-in-out infinite;
+    pointer-events: none;
+  }
+  @keyframes shimmer-sweep {
+    0%   { transform: translateX(-100%); }
+    60%, 100% { transform: translateX(100%); }
+  }
+
+  /* ── Glowing pill / badge breathing ── */
+  @keyframes glow-breathe {
+    0%, 100% { box-shadow: 0 0 12px rgba(98, 249, 238, 0.25); }
+    50%      { box-shadow: 0 0 26px rgba(98, 249, 238, 0.55); }
+  }
+  .animate-glow-breathe { animation: glow-breathe 3s ease-in-out infinite; }
+
+  /* ── Pop-in entrance (scale + fade), good for celebratory elements ── */
+  @keyframes pop-in {
+    0%   { transform: scale(0.8); opacity: 0; }
+    60%  { transform: scale(1.04); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  .animate-pop-in { animation: pop-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+
+  /* ── Soft bobbing for mascots / icons ── */
+  @keyframes bob {
+    0%, 100% { transform: translateY(0) rotate(-1deg); }
+    50%      { transform: translateY(-8px) rotate(1deg); }
+  }
+  .animate-bob { animation: bob 3.5s ease-in-out infinite; }
+
+  /* ── Twinkle for decorative sparkles ── */
+  @keyframes twinkle {
+    0%, 100% { opacity: 0.2; transform: scale(0.8); }
+    50%      { opacity: 1; transform: scale(1.15); }
+  }
+  .animate-twinkle { animation: twinkle 2.4s ease-in-out infinite; }
+
+  /* ── Slow conic spin for halo rings ── */
+  @keyframes spin-slow {
+    to { transform: rotate(360deg); }
+  }
+  .animate-spin-slow { animation: spin-slow 14s linear infinite; }
+
+  /* ── Document scan line sweep ── */
+  @keyframes scan-sweep {
+    0%        { top: 6%;  opacity: 0; }
+    12%       { opacity: 1; }
+    88%       { opacity: 1; }
+    100%      { top: 90%; opacity: 0; }
+  }
+  .animate-scan-sweep { animation: scan-sweep 1.9s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+
+  /* ── Staggered entrance delays for list reveals ── */
+  .stagger-children > * {
+    opacity: 0;
+    animation: slide-in-bottom 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+  .stagger-children > *:nth-child(1) { animation-delay: 0.05s; }
+  .stagger-children > *:nth-child(2) { animation-delay: 0.12s; }
+  .stagger-children > *:nth-child(3) { animation-delay: 0.19s; }
+  .stagger-children > *:nth-child(4) { animation-delay: 0.26s; }
+  .stagger-children > *:nth-child(5) { animation-delay: 0.33s; }
+  .stagger-children > *:nth-child(6) { animation-delay: 0.40s; }
+  .stagger-children > *:nth-child(7) { animation-delay: 0.47s; }
+  .stagger-children > *:nth-child(8) { animation-delay: 0.54s; }
+
+  .delay-100 { animation-delay: 0.1s; }
+  .delay-200 { animation-delay: 0.2s; }
+  .delay-300 { animation-delay: 0.3s; }
+  .delay-500 { animation-delay: 0.5s; }
+
+  /* ── Subtle film-grain texture — breaks up large flat fills. Pure SVG
+        feTurbulence data-URI: zero network cost, GPU-composited overlay. ── */
+  .texture-noise::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: 0.05;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    z-index: 0;
+  }
+
+  /* ── Decorative orb helper ── */
+  .orb {
+    position: absolute;
+    border-radius: 9999px;
+    filter: blur(90px);
+    pointer-events: none;
+    z-index: -1;
+  }
+
+  /* ── Gradient ring border (wrap content needing a glowing edge) ── */
+  .ring-gradient {
+    position: relative;
+  }
+  .ring-gradient::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg, rgba(98, 249, 238, 0.6), rgba(124, 58, 237, 0.35), transparent 70%);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  /* ── Respect reduced-motion preferences (accessibility) ── */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    body::before,
+    .text-gradient-teal,
+    .text-gradient-warm {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+    }
+    /* Never leave reveal-animated content invisible when motion is off */
+    .stagger-children > *,
+    .animate-slide-in,
+    .animate-fade-in,
+    .animate-pop-in {
+      opacity: 1 !important;
+      transform: none !important;
+    }
+  }
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Foundation pass
+   Global rules that lift every screen at once, rather than per-component
+   patches that drift apart. Nothing here overrides the reader spec.
+   ─────────────────────────────────────────────────────────────────────────── */
+@layer base {
+  /* There were no focus styles anywhere. Keyboard users had no idea where they
+     were — and a teacher tabbing through a roster is a real use case. Cyan ring
+     with an offset so it reads against both the dark chrome and the cream
+     reader. :focus-visible only, so pointer users never see it. */
+  /* Focus rings are already defined at the top of this file (*:focus-visible).
+     An earlier audit reported them missing because the grep looked for
+     Tailwind's `focus-visible:` variant syntax rather than plain CSS. Verified
+     working in-browser: cyan, 2px, on keyboard focus only. */
+
+  /* Headings broke to leave one orphaned word on the last line, which reads as
+     sloppy at every size. */
+  h1, h2, h3, h4 {
+    text-wrap: balance;
+  }
+  p, li {
+    text-wrap: pretty;
+  }
+
+  /* Digits in tables and stat tiles jittered as values changed, because the
+     body face has proportional figures. */
+  .font-mono-metadata, table, [data-numeric] {
+    font-variant-numeric: tabular-nums;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+  }
+}
+
+@layer utilities {
+  /* h-screen uses the largest viewport height, so on iOS Safari the layout
+     jumps by the toolbar height when the address bar collapses. dvh tracks it. */
+  .h-dvh { height: 100dvh; }
+  .min-h-dvh { min-height: 100dvh; }
+
+  /* Surfaces were uniformly flat with an identical radius everywhere, which is
+     the single loudest "generated" tell. A radius ramp gives containers and the
+     things inside them a believable relationship. */
+  .r-chip { border-radius: 10px; }
+  .r-card { border-radius: 18px; }
+  .r-hero { border-radius: 28px; }
+
+  /* Light comes from top-centre, consistently: a 1px inner highlight on the top
+     edge and a shadow tinted with the page hue rather than flat black. Pure
+     black shadows on a teal-black ground look like a sticker. */
+  .surface-lit {
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.06),
+      0 10px 30px -12px rgb(0 20 24 / 0.65);
+  }
+
+  /* Very fine grain over large flat fills. Flat vector surfaces read as
+     sterile; this is below conscious notice but removes the plastic look. */
+  .grain::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: inherit;
+    opacity: 0.035;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+}
+
+@layer utilities {
+  /* Gradient text sat on 25 headings across 21 pages — every page title in the
+     app. It is the single loudest "generated" signal, it costs contrast
+     (the mid-stop is the lightest part of the ramp, on a dark ground), and it
+     defeats subpixel hinting on Tamil, whose diacritics are already fine.
+
+     Headings now carry weight and tracking instead of colour. The gradient is
+     kept for genuine hero moments only — see .text-hero-teal. */
+  .heading-display {
+    color: var(--color-on-surface);
+    letter-spacing: -0.022em;
+    font-weight: 800;
+    text-wrap: balance;
+  }
+  .heading-display-accent {
+    color: var(--color-primary-fixed);
+    letter-spacing: -0.018em;
+    font-weight: 800;
+    text-wrap: balance;
+  }
+  /* Tamil is never tracked — the vowel signs and pulli are positioned relative
+     to the base glyph and letter-spacing pulls them off it. */
+  /* Any Tamil face, not just the display one. This listed only
+     .font-display-tamil, so a reader-face heading picked up
+     heading-display's -0.022em and rendered Tamil with negative tracking --
+     which collides the vowel signs and pulli exactly as positive tracking
+     pulls them apart. Caught by the browser sweep, which reads computed
+     styles; the source-scanning guard cannot see a selector that fails to
+     match. */
+  :is(.font-display-tamil, .font-body-tamil, .font-reader-tamil,
+      .font-tamil-reader, .font-tamil-body):is(.heading-display, .heading-display-accent) {
+    letter-spacing: 0;
+  }
+}

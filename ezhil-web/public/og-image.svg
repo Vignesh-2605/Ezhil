@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <radialGradient id="sky" cx="30%" cy="10%" r="120%">
+      <stop offset="0%" stop-color="#12202B"/>
+      <stop offset="60%" stop-color="#0A0D12"/>
+      <stop offset="100%" stop-color="#050608"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#62F9EE" stop-opacity="0.16"/>
+      <stop offset="100%" stop-color="#62F9EE" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="tile" cx="50%" cy="30%" r="90%">
+      <stop offset="0%" stop-color="#17444B"/>
+      <stop offset="100%" stop-color="#0F2E33"/>
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#sky)"/>
+
+  <!-- stars + fireflies -->
+  <g fill="#62F9EE">
+    <circle cx="120" cy="90" r="2.5" opacity="0.8"/>
+    <circle cx="300" cy="60" r="1.8" opacity="0.5"/>
+    <circle cx="520" cy="110" r="2" opacity="0.6"/>
+    <circle cx="1050" cy="80" r="2.4" opacity="0.7"/>
+    <circle cx="900" cy="150" r="1.6" opacity="0.5"/>
+    <circle cx="1130" cy="230" r="1.8" opacity="0.45"/>
+    <circle cx="80" cy="260" r="1.6" opacity="0.4"/>
+  </g>
+  <g fill="#FBF3E0">
+    <circle cx="220" cy="160" r="1.4" opacity="0.5"/>
+    <circle cx="700" cy="70" r="1.5" opacity="0.55"/>
+    <circle cx="980" cy="300" r="1.3" opacity="0.4"/>
+  </g>
+
+  <!-- crescent moon -->
+  <g transform="translate(1010 110)">
+    <circle r="46" fill="#FBF3E0" opacity="0.9"/>
+    <circle cx="-18" cy="-10" r="42" fill="url(#sky)"/>
+  </g>
+
+  <!-- distant hills -->
+  <path d="M0 470 q150 -70 320 -28 q180 44 380 -10 q200 -52 500 18 l0 180 l-1200 0 z" fill="#0F2E33"/>
+  <!-- near hills -->
+  <path d="M0 540 q220 -60 480 -18 q260 42 720 -8 l0 116 l-1200 0 z" fill="#17444B"/>
+
+  <!-- palmyra palms -->
+  <g transform="translate(150 430)" fill="#0A1A1E">
+    <rect x="-5" y="0" width="10" height="90" rx="5"/>
+    <path d="M0 4 q-38 -26 -58 -10 q28 4 50 20 z"/>
+    <path d="M0 4 q38 -26 58 -10 q-28 4 -50 20 z"/>
+    <path d="M0 2 q-16 -38 -40 -40 q18 16 32 42 z"/>
+    <path d="M0 2 q16 -38 40 -40 q-18 16 -32 42 z"/>
+    <path d="M0 0 q0 -40 -6 -52 q12 14 14 52 z"/>
+  </g>
+  <g transform="translate(1080 460) scale(0.7)" fill="#0A1A1E">
+    <rect x="-5" y="0" width="10" height="90" rx="5"/>
+    <path d="M0 4 q-38 -26 -58 -10 q28 4 50 20 z"/>
+    <path d="M0 4 q38 -26 58 -10 q-28 4 -50 20 z"/>
+    <path d="M0 2 q-16 -38 -40 -40 q18 16 32 42 z"/>
+    <path d="M0 2 q16 -38 40 -40 q-18 16 -32 42 z"/>
+  </g>
+
+  <!-- village houses with lit windows -->
+  <g transform="translate(870 500)">
+    <rect x="0" y="16" width="70" height="48" rx="4" fill="#0A1A1E"/>
+    <path d="M-6 20 l41 -26 l41 26 z" fill="#122830"/>
+    <rect x="26" y="34" width="16" height="14" rx="2" fill="#FFB955" opacity="0.85"/>
+  </g>
+  <g transform="translate(960 520) scale(0.8)">
+    <rect x="0" y="16" width="70" height="48" rx="4" fill="#0C1E24"/>
+    <path d="M-6 20 l41 -26 l41 26 z" fill="#122830"/>
+    <rect x="26" y="34" width="16" height="14" rx="2" fill="#FFB955" opacity="0.7"/>
+  </g>
+
+  <!-- cyan ambient glow behind lockup -->
+  <ellipse cx="600" cy="300" rx="480" ry="260" fill="url(#glow)"/>
+
+  <!-- owl mark tile -->
+  <g transform="translate(376 160) scale(2.2)">
+    <rect width="64" height="64" rx="15" fill="url(#tile)"/>
+    <path d="M15 16 q-1.5 -7 5 -8.5 q1.5 5.5 -0.5 8 z" fill="#17444B"/>
+    <path d="M49 16 q1.5 -7 -5 -8.5 q-1.5 5.5 0.5 8 z" fill="#17444B"/>
+    <ellipse cx="32" cy="34" rx="23" ry="24" fill="#17444B"/>
+    <path d="M12 20 q9 -6 17 -1.5" stroke="#62F9EE" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+    <path d="M35 18.5 q8 -4.5 17 1.5" stroke="#62F9EE" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+    <circle cx="22" cy="32" r="11" fill="#FBF3E0"/>
+    <circle cx="42" cy="32" r="11" fill="#FBF3E0"/>
+    <circle cx="23.5" cy="33" r="5.4" fill="#0F2E33"/>
+    <circle cx="40.5" cy="33" r="5.4" fill="#0F2E33"/>
+    <circle cx="25.4" cy="31.2" r="1.8" fill="#fff"/>
+    <circle cx="42.4" cy="31.2" r="1.8" fill="#fff"/>
+    <path d="M32 42 l-4.2 3.2 q4.2 5.4 8.4 0 z" fill="#FFB955"/>
+  </g>
+
+  <!-- wordmark -->
+  <text x="560" y="262" font-family="'Noto Sans Tamil', 'Latha', sans-serif" font-size="104" font-weight="800" fill="#FBF3E0">எழில்</text>
+  <text x="565" y="316" font-family="'DM Sans', 'Segoe UI', sans-serif" font-size="30" font-weight="600" letter-spacing="14" fill="#62F9EE">EZHIL</text>
+
+  <!-- tagline -->
+  <text x="600" y="420" text-anchor="middle" font-family="'Noto Sans Tamil', sans-serif" font-size="34" fill="#B0B8C8">ஒரு நேரத்தில் ஒரு கதை</text>
+  <text x="600" y="458" text-anchor="middle" font-family="'DM Sans', 'Segoe UI', sans-serif" font-size="21" letter-spacing="4" fill="#6B7C93">TAMIL LITERACY · ONE STORY AT A TIME</text>
+</svg>

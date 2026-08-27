@@ -1,0 +1,18 @@
+{
+  "name": "ezhil-tests",
+  "private": true,
+  "version": "1.0.0",
+  "type": "commonjs",
+  "description": "Load, E2E and security checks for Ezhil. Every number these produce is measured, not synthesised.",
+  "scripts": {
+    "load": "node load/run-load.js",
+    "e2e": "node e2e/run-e2e.js",
+    "security": "node security/scan.js",
+    "report": "node reports/build-report.js"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0",
+    "mocha": "^11.8.0",
+    "selenium-webdriver": "^4.47.0"
+  }
+}

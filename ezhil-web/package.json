@@ -1,0 +1,35 @@
+{
+  "name": "ezhil-web",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "dexie": "^4.4.3",
+    "dexie-react-hooks": "^4.4.0",
+    "mammoth": "^1.8.0",
+    "motion": "^12.42.2",
+    "pdfjs-dist": "^4.9.155",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-router-dom": "^7.1.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.0",
+    "@types/node": "^26.3.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "tailwindcss": "^4.1.0",
+    "typescript": "~5.7.0",
+    "vite": "^6.0.0",
+    "vitest": "^4.1.9"
+  }
+}

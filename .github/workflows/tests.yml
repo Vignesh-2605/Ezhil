@@ -1,0 +1,383 @@
+name: Ezhil Test Suite
+
+# Five suites in parallel, then one job that compiles the master report and
+# publishes it. Each suite uploads its own JSON so the report job can rebuild
+# the whole picture even when one suite failed.
+on:
+  push:
+    branches: [main, master, 'fix/**', 'feat/**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+env:
+  NODE_VERSION: '22'
+  PYTHON_VERSION: '3.13'
+
+jobs:
+  # ── 1 · Selenium — Website Functional ──────────────────────────────────────
+  web-functional:
+    name: Selenium — Website Functional
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '${{ env.NODE_VERSION }}' }
+      - uses: actions/setup-python@v5
+        with: { python-version: '${{ env.PYTHON_VERSION }}' }
+
+      - name: Install backend
+        working-directory: ezhil-backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Start backend
+        working-directory: ezhil-backend
+        env:
+          SECRET_KEY: ci-secret-key-not-used-outside-ci
+          DEMO_MODE: 'false'
+          # The heavy models are not present on a runner. The suites under test
+          # here never call them; a suite that did would fail rather than
+          # silently pass against a stub.
+          OCR_ENGINE: paddle
+        run: |
+          cp .env.example .env 2>/dev/null || true
+          python main.py > /tmp/backend.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf http://127.0.0.1:8080/health && break || sleep 2
+          done
+          curl -sf http://127.0.0.1:8080/health || { echo "backend never became healthy"; cat /tmp/backend.log; exit 1; }
+
+      - name: Build and serve the web app
+        working-directory: ezhil-web
+        run: |
+          npm ci
+          npm run build
+          npx vite preview --port 3000 --host 127.0.0.1 > /tmp/preview.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:3000/ && break || sleep 1; done
+          curl -sf http://127.0.0.1:3000/ || { echo "preview never came up"; cat /tmp/preview.log; exit 1; }
+
+      - name: Run suite
+        working-directory: ezhil-tests
+        env:
+          TEST_BASE_URL: http://127.0.0.1:3000
+          BACKEND_URL: http://127.0.0.1:8080
+        run: |
+          npm ci
+          node suites/web-functional.js
+
+      - name: Backend log on failure
+        if: failure()
+        run: tail -100 /tmp/backend.log || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: selenium-web-report
+          path: ezhil-tests/reports/web-functional.json
+
+  # ── 2 · Selenium — Website UI & Accessibility ──────────────────────────────
+  web-ui-a11y:
+    name: Selenium — UI & Accessibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '${{ env.NODE_VERSION }}' }
+      - uses: actions/setup-python@v5
+        with: { python-version: '${{ env.PYTHON_VERSION }}' }
+
+      - name: Install and start backend
+        working-directory: ezhil-backend
+        env:
+          SECRET_KEY: ci-secret-key-not-used-outside-ci
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          cp .env.example .env 2>/dev/null || true
+          python main.py > /tmp/backend.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf http://127.0.0.1:8080/health && break || sleep 2; done
+          curl -sf http://127.0.0.1:8080/health || { cat /tmp/backend.log; exit 1; }
+
+      - name: Build and serve the web app
+        working-directory: ezhil-web
+        run: |
+          npm ci
+          npm run build
+          npx vite preview --port 3000 --host 127.0.0.1 > /tmp/preview.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:3000/ && break || sleep 1; done
+          curl -sf http://127.0.0.1:3000/ || { cat /tmp/preview.log; exit 1; }
+
+      - name: Run suite
+        working-directory: ezhil-tests
+        env:
+          TEST_BASE_URL: http://127.0.0.1:3000
+          BACKEND_URL: http://127.0.0.1:8080
+        run: |
+          npm ci
+          node suites/web-ui-a11y.js
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ui-a11y-report
+          path: ezhil-tests/reports/web-ui-a11y.json
+
+  # ── 3 · Unit & API ─────────────────────────────────────────────────────────
+  api-unit:
+    name: Unit & API
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '${{ env.NODE_VERSION }}' }
+      - uses: actions/setup-python@v5
+        with: { python-version: '${{ env.PYTHON_VERSION }}' }
+
+      - name: Install backend and web deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r ezhil-backend/requirements.txt
+          npm --prefix ezhil-web ci
+          npm --prefix ezhil-tests ci
+
+      - name: Start backend
+        working-directory: ezhil-backend
+        env:
+          SECRET_KEY: ci-secret-key-not-used-outside-ci
+        run: |
+          cp .env.example .env 2>/dev/null || true
+          python main.py > /tmp/backend.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf http://127.0.0.1:8080/health && break || sleep 2; done
+          curl -sf http://127.0.0.1:8080/health || { cat /tmp/backend.log; exit 1; }
+
+      - name: Run suite
+        working-directory: ezhil-tests
+        env:
+          BACKEND_URL: http://127.0.0.1:8080
+          # The venv path the suite uses on Windows does not exist here.
+          PYTEST_PYTHON: python
+        run: node suites/api-contract.js
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unit-test-report
+          path: ezhil-tests/reports/api-contract.json
+
+  # ── 4 · Android ────────────────────────────────────────────────────────────
+  android:
+    name: Appium — Android
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '${{ env.NODE_VERSION }}' }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+
+      - name: Build debug APK and run unit tests
+        working-directory: ezhil-android
+        run: |
+          chmod +x ./gradlew
+          ./gradlew testDebugUnitTest assembleDebug --no-daemon
+
+      - name: Build the web bundle
+        # The static suite asserts the web dist exists as a deployable artifact.
+        run: |
+          npm --prefix ezhil-web ci
+          npm --prefix ezhil-web run build
+
+      - name: Run build and source contracts
+        working-directory: ezhil-tests
+        run: |
+          npm ci
+          node suites/android-static.js
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Install Appium
+        run: |
+          npm install -g appium@2
+          appium driver install uiautomator2
+
+      - name: On-device suite
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 29
+          target: default
+          arch: x86_64
+          profile: Nexus 6
+          disable-animations: true
+          script: |
+            appium --log-level warn > /tmp/appium.log 2>&1 &
+            for i in $(seq 1 40); do curl -sf http://127.0.0.1:4723/status && break || sleep 2; done
+            curl -sf http://127.0.0.1:4723/status || { echo "appium never started"; cat /tmp/appium.log; exit 1; }
+            cd ezhil-tests
+            APK_PATH="$GITHUB_WORKSPACE/ezhil-android/app/build/outputs/apk/debug/app-x86_64-debug.apk" \
+            APPIUM_URL=http://127.0.0.1:4723 \
+            node suites/android-appium.js
+
+      - name: Appium log on failure
+        if: failure()
+        run: tail -120 /tmp/appium.log || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: appium-android-report
+          path: |
+            ezhil-tests/reports/android-static.json
+            ezhil-tests/reports/android-appium.json
+
+  # ── 5 · Load & Deployment ──────────────────────────────────────────────────
+  load-deploy:
+    name: Load Testing — Performance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '${{ env.NODE_VERSION }}' }
+      - uses: actions/setup-python@v5
+        with: { python-version: '${{ env.PYTHON_VERSION }}' }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+
+      - name: Build the artifacts the suite inspects
+        run: |
+          npm --prefix ezhil-web ci
+          npm --prefix ezhil-web run build
+          cd ezhil-android && chmod +x ./gradlew && ./gradlew assembleDebug --no-daemon
+
+      - name: Start backend
+        working-directory: ezhil-backend
+        env:
+          SECRET_KEY: ci-secret-key-not-used-outside-ci
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          cp .env.example .env 2>/dev/null || true
+          python main.py > /tmp/backend.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf http://127.0.0.1:8080/health && break || sleep 2; done
+          curl -sf http://127.0.0.1:8080/health || { cat /tmp/backend.log; exit 1; }
+
+      - name: Run suite
+        working-directory: ezhil-tests
+        env:
+          BACKEND_URL: http://127.0.0.1:8080
+          # A shared runner is slower and noisier than a developer machine, so
+          # the levels are gentler here. The budgets in the suite still apply.
+          LOAD_LEVELS: '10,25,50'
+          LOAD_SECONDS: '6'
+        run: |
+          npm ci
+          node suites/load-matrix.js
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: load-test-report
+          path: ezhil-tests/reports/load-matrix.json
+
+  # ── Compile master report & deploy ─────────────────────────────────────────
+  report:
+    name: Compile Master Report & Deploy
+    runs-on: ubuntu-latest
+    needs: [web-functional, web-ui-a11y, api-unit, android, load-deploy]
+    # Runs even when a suite failed: a report that only appears on success is
+    # useless exactly when it is needed.
+    if: always()
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '${{ env.NODE_VERSION }}' }
+
+      - name: Collect every suite's results
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/artifacts
+
+      - name: Gather into reports/
+        working-directory: ezhil-tests
+        run: |
+          mkdir -p reports
+          find /tmp/artifacts -name '*.json' -exec cp {} reports/ \;
+          echo "Collected:"; ls -la reports/
+
+      - name: Build the report
+        working-directory: ezhil-tests
+        run: |
+          npm ci
+          node reports/build-report.js
+
+      - name: Write the run summary
+        working-directory: ezhil-tests
+        run: |
+          node -e '
+            const fs=require("fs");
+            const files=fs.readdirSync("reports").filter(f=>f.endsWith(".json"));
+            let t=0,p=0,f2=0;
+            const lines=["| Suite | Passed | Total | Result |","|---|---:|---:|---|"];
+            for(const f of files){
+              const d=JSON.parse(fs.readFileSync("reports/"+f,"utf8"));
+              if(!d.summary) continue;
+              t+=d.summary.total; p+=d.summary.passed; f2+=d.summary.failed;
+              lines.push(`| ${d.summary.suite} | ${d.summary.passed} | ${d.summary.total} | ${d.summary.failed?"❌ "+d.summary.failed+" failed":"✅"} |`);
+            }
+            lines.push(`| **Total** | **${p}** | **${t}** | ${f2?"❌":"✅"} |`);
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, "## Ezhil test execution\n\n"+lines.join("\n")+"\n");
+          '
+
+      - name: Publish the report into the web bundle
+        run: |
+          npm --prefix ezhil-web ci
+          npm --prefix ezhil-web run build
+          mkdir -p ezhil-web/dist/reports/latest
+          mkdir -p "ezhil-web/dist/reports/history/build-${{ github.run_number }}"
+          cp ezhil-tests/reports/execution-report.html ezhil-web/dist/reports/latest/index.html
+          cp ezhil-tests/reports/execution-report.html "ezhil-web/dist/reports/history/build-${{ github.run_number }}/index.html"
+          cp ezhil-tests/reports/execution-report.xlsx ezhil-web/dist/reports/latest/execution-report.xlsx
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: full-e2e-report
+          path: |
+            ezhil-tests/reports/execution-report.html
+            ezhil-tests/reports/execution-report.xlsx
+
+      # Native Pages deployment. Pushing compiled HTML to a gh-pages branch
+      # from the same workflow that triggers a Pages build deadlocks the runner.
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: ezhil-web/dist
+      - id: pages
+        uses: actions/deploy-pages@v4
+
+      - name: Fail the run if any suite failed
+        working-directory: ezhil-tests
+        run: |
+          node -e '
+            const fs=require("fs");
+            const files=fs.readdirSync("reports").filter(f=>f.endsWith(".json")&&f!=="execution-report.json");
+            let failed=0;
+            for(const f of files){
+              const d=JSON.parse(fs.readFileSync("reports/"+f,"utf8"));
+              if(d.summary) failed+=d.summary.failed;
+            }
+            if(failed){ console.error(`${failed} assertion(s) failed`); process.exit(1); }
+            console.log("all suites green");
+          '
