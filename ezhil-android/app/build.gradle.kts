@@ -82,7 +82,13 @@ android {
         abi {
             isEnable = true
             reset()
-            include("arm64-v8a", "armeabi-v7a")
+            // The two ABIs a classroom handset actually uses. CI adds x86_64
+            // with -PezhilExtraAbi=x86_64 so the emulator has something it can
+            // install, without that architecture ever reaching a release.
+            val extra = (project.findProperty("ezhilExtraAbi") as String?)
+                ?.split(",")?.map(String::trim)?.filter(String::isNotEmpty)
+                ?: emptyList()
+            include(*(listOf("arm64-v8a", "armeabi-v7a") + extra).toTypedArray())
             isUniversalApk = true
         }
     }

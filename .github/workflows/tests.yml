@@ -47,6 +47,9 @@ jobs:
           OCR_ENGINE: paddle
         run: |
           cp .env.example .env 2>/dev/null || true
+          # Every suite authenticates as the demo teacher or student. Without
+          # this the database is empty and they all die at "Invalid credentials".
+          python seed.py
           python main.py > /tmp/backend.log 2>&1 &
           for i in $(seq 1 60); do
             curl -sf http://127.0.0.1:8080/health && break || sleep 2
@@ -100,6 +103,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           cp .env.example .env 2>/dev/null || true
+          # Every suite authenticates as the demo teacher or student. Without
+          # this the database is empty and they all die at "Invalid credentials".
+          python seed.py
           python main.py > /tmp/backend.log 2>&1 &
           for i in $(seq 1 60); do curl -sf http://127.0.0.1:8080/health && break || sleep 2; done
           curl -sf http://127.0.0.1:8080/health || { cat /tmp/backend.log; exit 1; }
@@ -152,6 +158,9 @@ jobs:
           SECRET_KEY: ci-secret-key-not-used-outside-ci
         run: |
           cp .env.example .env 2>/dev/null || true
+          # Every suite authenticates as the demo teacher or student. Without
+          # this the database is empty and they all die at "Invalid credentials".
+          python seed.py
           python main.py > /tmp/backend.log 2>&1 &
           for i in $(seq 1 60); do curl -sf http://127.0.0.1:8080/health && break || sleep 2; done
           curl -sf http://127.0.0.1:8080/health || { cat /tmp/backend.log; exit 1; }
@@ -185,7 +194,9 @@ jobs:
         working-directory: ezhil-android
         run: |
           chmod +x ./gradlew
-          ./gradlew testDebugUnitTest assembleDebug --no-daemon
+          # x86_64 so the emulator has something it can install. The ABI
+          # list that ships is unchanged.
+          ./gradlew testDebugUnitTest assembleDebug --no-daemon -PezhilExtraAbi=x86_64
 
       - name: Build the web bundle
         # The static suite asserts the web dist exists as a deployable artifact.
@@ -227,8 +238,12 @@ jobs:
             for i in $(seq 1 40); do curl -sf http://127.0.0.1:4723/status && break || sleep 2; done
             curl -sf http://127.0.0.1:4723/status || { echo "appium never started"; cat /tmp/appium.log; exit 1; }
             cd ezhil-tests
-            APK_PATH="$GITHUB_WORKSPACE/ezhil-android/app/build/outputs/apk/debug/app-x86_64-debug.apk" \
-            APPIUM_URL=http://127.0.0.1:4723 \
+            # The env-prefix-with-continuation form is not valid in the
+            # runner shell, which reported: /usr/bin/sh: 1: \: not found
+            export APK_PATH="$GITHUB_WORKSPACE/ezhil-android/app/build/outputs/apk/debug/app-x86_64-debug.apk"
+            export APPIUM_URL=http://127.0.0.1:4723
+            ls -la "$APK_PATH" || { echo "no x86_64 APK was built"; exit 1; }
+            adb wait-for-device
             node suites/android-appium.js
 
       - name: Appium log on failure
@@ -270,6 +285,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           cp .env.example .env 2>/dev/null || true
+          # Every suite authenticates as the demo teacher or student. Without
+          # this the database is empty and they all die at "Invalid credentials".
+          python seed.py
           python main.py > /tmp/backend.log 2>&1 &
           for i in $(seq 1 60); do curl -sf http://127.0.0.1:8080/health && break || sleep 2; done
           curl -sf http://127.0.0.1:8080/health || { cat /tmp/backend.log; exit 1; }
@@ -363,15 +381,19 @@ jobs:
 
       # Native Pages deployment. Pushing compiled HTML to a gh-pages branch
       # from the same workflow that triggers a Pages build deadlocks the runner.
-      - uses: actions/configure-pages@v5
-        # Turns Pages on the first time this runs, instead of failing with a
-        # 404 because the repository has never had it enabled.
-        with:
-          enablement: true
+      # Pages has to be switched on once by a human: Settings -> Pages ->
+      # Source: GitHub Actions. GITHUB_TOKEN may deploy to a site that exists
+      # but is not permitted to create one, so these steps are best-effort.
+      # The report is uploaded as an artifact above either way.
+      - id: setup-pages
+        uses: actions/configure-pages@v5
+        continue-on-error: true
       - uses: actions/upload-pages-artifact@v3
+        if: steps.setup-pages.outcome == 'success'
         with:
           path: ezhil-web/dist
       - id: pages
+        if: steps.setup-pages.outcome == 'success'
         uses: actions/deploy-pages@v4
 
       - name: Fail the run if any suite failed
