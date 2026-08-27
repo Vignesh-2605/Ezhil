@@ -358,7 +358,15 @@ fun TeacherLoginScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Weighted so the long bilingual label yields space instead
+                    // of claiming its full desired width. Without this it
+                    // measured first and left "Server" about 96dp, which wrapped
+                    // it to one character per line down the right edge — on the
+                    // first screen anyone sees.
+                    Row(
+                        modifier = Modifier.weight(1f, fill = false),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Box(modifier = Modifier.size(6.dp).background(Success, CircleShape))
                         Spacer(Modifier.width(Spacing.xs))
                         Text(
@@ -366,11 +374,14 @@ fun TeacherLoginScreen(
                             color = TextMuted, fontFamily = DMSans, fontSize = 12.sp
                         )
                     }
+                    Spacer(Modifier.width(Spacing.sm))
                     // The server address is set here rather than baked in at
                     // build time, so one APK works on any network.
                     Text(
                         text = "Server",
                         color = Cyan, fontFamily = DMSans, fontSize = 12.sp,
+                        maxLines = 1,
+                        softWrap = false,
                         modifier = Modifier.clickable { showServerDialog = true }
                     )
                 }

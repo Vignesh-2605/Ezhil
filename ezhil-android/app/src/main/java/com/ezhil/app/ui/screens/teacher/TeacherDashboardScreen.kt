@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -173,55 +174,46 @@ fun TeacherDashboardScreen(
                                         color = TextPrimary
                                     )
                                 )
-                                EzhilText(
-                                    key = StringKey.YOUR_CLASSROOM,
-                                    language = language,
-                                    style = TextStyle(
-                                        fontFamily = DMSans,
-                                        fontSize = 13.sp,
-                                        color = Amber
-                                    )
+                                // The class size lives here rather than in its
+                                // own tile. It is context for the greeting, not
+                                // a number a teacher acts on, and giving it
+                                // equal weight to the risk counts was part of
+                                // what made this screen read as seven competing
+                                // figures.
+                                Text(
+                                    text = "${EzhilStrings.get(StringKey.YOUR_CLASSROOM, language)} · " +
+                                        "${uiState.students.size} " +
+                                        EzhilStrings.get(StringKey.STUDENTS_COUNT, language),
+                                    fontFamily = DMSans,
+                                    fontSize = 13.sp,
+                                    color = Amber
                                 )
                             }
                         }
                     }
                 }
 
-                // Stats row: total students | high risk | low risk
+                // One row of four, not three-over-four.
+                //
+                // There used to be a second row above this one carrying total
+                // students, high risk and low risk — so high and low were each
+                // rendered twice, with the same numbers, in two different card
+                // styles, stacked on top of each other. Seven tiles in five
+                // colours, and two of the figures were duplicates. The class
+                // size has moved into the greeting card; what is left is the
+                // risk breakdown, which is the thing a teacher acts on.
                 item {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = screenGutter()),
-                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
-                    ) {
-                        DashboardStatTile(
-                            value = "${uiState.students.size}",
-                            label = EzhilStrings.get(StringKey.STUDENTS_COUNT, language),
-                            color = Amber,
-                            modifier = Modifier.weight(1f)
-                        )
-                        DashboardStatTile(
-                            value = "$high",
-                            label = EzhilStrings.get(StringKey.RISK_HIGH, language),
-                            color = RiskHigh,
-                            modifier = Modifier.weight(1f)
-                        )
-                        DashboardStatTile(
-                            value = "$low",
-                            label = EzhilStrings.get(StringKey.RISK_LOW, language),
-                            color = RiskLow,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
-
-                // Risk summary row
-                item {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
+                            .height(IntrinsicSize.Min)
                             .padding(horizontal = screenGutter(), vertical = Spacing.sm),
+                        // IntrinsicSize.Min measures the tallest child and
+                        // gives every card that height. Alignment alone only
+                        // centres them; a minimum height only sets a floor.
+                        // "Medium Risk" wraps to two lines where "Low Risk"
+                        // does not, so without this the row stays ragged.
+                        verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
                     ) {
                         RiskSummaryCard(
@@ -341,13 +333,26 @@ private fun RiskSummaryCard(
 ) {
     Column(
         modifier = modifier
+            // Two lines of label at 12sp plus the count, reserved whether or
+            // not this particular label wraps. "அதிக கவனம்" needs two lines at
+            // a quarter of a 720px screen and "இயல்பு" needs one, which left
+            // the four cards at different heights and a ragged bottom edge.
+            .fillMaxHeight()
             .background(bg, RoundedCornerShape(10.dp))
             .border(1.dp, color.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
             .padding(vertical = Spacing.sm, horizontal = Spacing.xs),
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
         Text("$count", fontFamily = DMSans, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = color)
-        Text(label, fontFamily = DMSans, fontSize = 12.sp, color = color.copy(alpha = 0.8f))
+        Text(
+            label,
+            fontFamily = DMSans,
+            fontSize = 12.sp,
+            color = color.copy(alpha = 0.8f),
+            textAlign = TextAlign.Center,
+            maxLines = 2
+        )
     }
 }
 

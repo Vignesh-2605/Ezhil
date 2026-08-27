@@ -15,6 +15,7 @@ const ExcelJS = require('exceljs');
 const DIR = __dirname;
 const OUT_XLSX = path.join(DIR, 'execution-report.xlsx');
 const OUT_HTML = path.join(DIR, 'execution-report.html');
+const OUT_JSON = path.join(DIR, 'execution-report.json');
 
 const SUITE_FILES = [
   'web-functional.json',
@@ -41,6 +42,27 @@ function loadSuites() {
 }
 
 const pct = n => `${(n * 100).toFixed(1)}%`;
+
+/**
+ * A suite name Excel will accept as a tab.
+ *
+ * Excel caps sheet names at 31 characters and rejects : \ / ? * [ ]. Two of
+ * ours are over the cap — "Selenium — Website UI & Accessibility" is 37 — so
+ * they are trimmed rather than silently rejected at write time. The `used` set
+ * keeps names unique if trimming makes two collide.
+ */
+function sheetName(raw, used) {
+  let name = String(raw).replace(/[:\/?*[\]]/g, '-').trim();
+  if (name.length > 31) name = name.slice(0, 31).trim();
+  let candidate = name || 'Suite';
+  let n = 2;
+  while (used.has(candidate)) {
+    const suffix = ` ${n++}`;
+    candidate = `${name.slice(0, 31 - suffix.length)}${suffix}`;
+  }
+  used.add(candidate);
+  return candidate;
+}
 
 async function buildExcel(suites, totals) {
   const wb = new ExcelJS.Workbook();
@@ -128,7 +150,53 @@ async function buildExcel(suites, totals) {
   });
   totalRow.font = { bold: true };
 
+  // ── One tab per suite ─────────────────────────────────────────────────────
+  // The roll-up sheets answer "did it pass"; these answer "what ran, and what
+  // exactly failed" without filtering a combined sheet of ~1,600 rows.
+  const used = new Set(['Test Report', 'Testing Types Summary', 'Run Summary']);
+  for (const s of suites) {
+    const sh = wb.addWorksheet(sheetName(s.summary.suite, used), {
+      views: [{ state: 'frozen', ySplit: 1 }],
+    });
+    sh.columns = [
+      { header: 'Category', key: 'category', width: 32 },
+      { header: 'Test case', key: 'name', width: 74 },
+      { header: 'Status', key: 'status', width: 10 },
+      { header: 'Duration (ms)', key: 'durationMs', width: 15 },
+      { header: 'Error', key: 'error', width: 70 },
+      { header: 'Recorded at (UTC)', key: 'at', width: 24 },
+    ];
+    styleHeader(sh.getRow(1));
+    for (const r of s.rows) sh.addRow(r);
+    sh.getColumn('durationMs').numFmt = '0.000';
+    sh.autoFilter = { from: 'A1', to: 'F1' };
+    sh.eachRow((row, i) => {
+      if (i === 1) return;
+      const failed = row.getCell('status').value === 'failed';
+      row.getCell('status').font = { bold: true, color: { argb: failed ? 'FFB4453C' : 'FF2F7D4F' } };
+      if (failed) row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF7E7E5' } };
+    });
+    // A tab that is all green should say so at a glance.
+    const tabColour = s.summary.failed > 0 ? 'FFB4453C' : 'FF2F7D4F';
+    sh.properties.tabColor = { argb: tabColour };
+  }
+
   await wb.xlsx.writeFile(OUT_XLSX);
+}
+
+/**
+ * The same run as machine-readable JSON.
+ *
+ * The workbook is for a person; this is for anything that needs to diff two
+ * runs or feed a dashboard. Both are written from one in-memory result, so
+ * they cannot disagree.
+ */
+function buildJson(suites, totals) {
+  fs.writeFileSync(OUT_JSON, JSON.stringify({
+    generatedAt: new Date().toISOString(),
+    totals,
+    suites: suites.map(s => ({ summary: s.summary, rows: s.rows })),
+  }, null, 2));
 }
 
 function buildHtml(suites, totals) {
@@ -242,6 +310,7 @@ async function main() {
 
   await buildExcel(suites, totals);
   fs.writeFileSync(OUT_HTML, buildHtml(suites, totals));
+  buildJson(suites, totals);
 
   console.log(`\nReport built from ${suites.length} suite(s)`);
   for (const s of suites) {

@@ -8,6 +8,11 @@ import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.ezhil.app.ui.strings.AppLanguage
+import com.ezhil.app.ui.viewmodel.AppLanguageViewModel
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
@@ -25,9 +30,18 @@ data class TeacherNavItem(
 )
 
 @Composable
-fun TeacherBottomNavBar(navController: NavHostController, currentRoute: String) {
+fun TeacherBottomNavBar(
+    navController: NavHostController,
+    currentRoute: String,
+    langVm: AppLanguageViewModel = hiltViewModel(),
+) {
+    // The bar always drew labelTamil, so the language toggle changed every
+    // other word on the screen and left the navigation in Tamil. It also made
+    // the bar overflow: "டாஷ்போர்டு" needs 132dp of a 144dp tab and wrapped to
+    // two lines against the screen edge, where "Home" fits easily.
+    val language by langVm.language.collectAsState()
     val items = listOf(
-        TeacherNavItem(Screen.TeacherDashboard.route, "டாஷ்போர்டு", "Home",    Icons.Default.Home),
+        TeacherNavItem(Screen.TeacherDashboard.route, "முகப்பு",    "Home",    Icons.Default.Home),
         TeacherNavItem(Screen.LessonLibrary.route,    "நூலகம்",     "Library", Icons.Default.Book),
         TeacherNavItem(Screen.Reports.route,          "அறிக்கை",    "Reports", Icons.Default.Analytics),
         TeacherNavItem(Screen.RosterManagement.route, "பட்டியல்",   "Roster",  Icons.Default.People),
@@ -57,7 +71,9 @@ fun TeacherBottomNavBar(navController: NavHostController, currentRoute: String) 
                 },
                 label = {
                     Text(
-                        text = item.labelTamil,
+                        text = if (language == AppLanguage.TAMIL) item.labelTamil
+                               else item.labelEnglish,
+                        maxLines = 2,
                         color = if (selected) Amber else TextMuted
                     )
                 },

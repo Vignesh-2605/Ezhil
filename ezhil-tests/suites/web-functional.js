@@ -93,8 +93,18 @@ async function main() {
     for (const route of PROTECTED) {
       await H.check(rec, 'Access control — anonymous', `${route.path} redirects to /login`, async () => {
         await H.visit(driver, route.path);
+        // Wait for the redirect rather than sampling once. The guard is a
+        // render-then-navigate, and on the heavier celebration screens the
+        // path held steady long enough to satisfy the settle before the
+        // navigation had fired — so /student/achievement and
+        // /student/milestone failed here while redirecting correctly in a
+        // real browser. The question is whether an anonymous visitor ends up
+        // at the login screen, not where they are 300ms in.
+        const landed = await driver
+          .wait(async () => (await driver.executeScript('return location.pathname')) === '/login', 6000)
+          .then(() => true, () => false);
         const p = await H.pageProbe(driver);
-        if (p.url !== '/login') throw new Error(`anonymous visitor reached ${p.url}`);
+        if (!landed) throw new Error(`anonymous visitor reached ${p.url}`);
       });
     }
 

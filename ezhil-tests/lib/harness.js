@@ -106,12 +106,16 @@ async function visit(driver, path) {
   // pathname has held steady, which is the condition actually being waited on.
   let last = null;
   let stableFor = 0;
+  const startedAt = Date.now();
   const deadline = Date.now() + 8000;
   while (Date.now() < deadline) {
     const now = await driver.executeScript('return location.pathname');
     stableFor = now === last ? stableFor + 1 : 0;
     last = now;
-    if (stableFor >= 2) break;
+    // Three polls, and never before 500ms have elapsed. Two polls could be
+    // satisfied by a path that simply had not navigated yet, which is the
+    // race this loop exists to remove.
+    if (stableFor >= 3 && Date.now() - startedAt > 500) break;
     await driver.sleep(120);
   }
   return driver;

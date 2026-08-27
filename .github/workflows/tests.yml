@@ -412,6 +412,7 @@ jobs:
           cp ezhil-tests/reports/execution-report.html ezhil-web/dist/reports/latest/index.html
           cp ezhil-tests/reports/execution-report.html "ezhil-web/dist/reports/history/build-${{ github.run_number }}/index.html"
           cp ezhil-tests/reports/execution-report.xlsx ezhil-web/dist/reports/latest/execution-report.xlsx
+          cp ezhil-tests/reports/execution-report.json ezhil-web/dist/reports/latest/execution-report.json
 
       - uses: actions/upload-artifact@v4
         with:
@@ -419,6 +420,7 @@ jobs:
           path: |
             ezhil-tests/reports/execution-report.html
             ezhil-tests/reports/execution-report.xlsx
+            ezhil-tests/reports/execution-report.json
 
       # Native Pages deployment. Pushing compiled HTML to a gh-pages branch
       # from the same workflow that triggers a Pages build deadlocks the runner.
