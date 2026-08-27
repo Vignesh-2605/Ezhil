@@ -27,8 +27,11 @@ ezhil-tests/reports/*.xlsx
 ezhil-tests/reports/*.html
 !ezhil-tests/reports/build-report.js
 
-# Model weights are gigabytes; see ezhil-backend/.env.example for expected paths
-models/
+# Model weights are gigabytes; see ezhil-backend/.env.example for expected paths.
+# Anchored to the repo root: an unanchored "models/" also matches
+# ezhil-backend/models (the SQLAlchemy package) and the Android app's bundled
+# OCR and screening assets, both of which the apps need to run.
+/models/
 
 # Editor and OS
 .idea/
