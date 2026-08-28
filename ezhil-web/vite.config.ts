@@ -4,6 +4,12 @@ import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // GitHub Pages serves the project site from /<repo>/, not from the domain
+  // root, so a bundle built with the default base asks for /assets/… and gets
+  // a 404 for every script — which renders as a blank white page with no error
+  // anyone would notice. Only the Pages build sets VITE_BASE; local dev, the
+  // CI preview server and any root-hosted deploy stay on '/'.
+  base: process.env.VITE_BASE || '/',
   server: {
     // Bind on all interfaces, not just loopback, so the app is reachable from
     // a phone on the same network or through a tunnel. Without this the dev

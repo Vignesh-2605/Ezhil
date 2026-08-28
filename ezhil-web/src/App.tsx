@@ -58,7 +58,11 @@ function App() {
   return (
     <AuthProvider>
       <LanguageProvider>
-        <BrowserRouter>
+        {/* Served from /<repo>/ on GitHub Pages and from / everywhere else.
+            Without the basename every route resolves one level too high on
+            Pages, so the app mounts and then matches nothing. BASE_URL carries
+            a trailing slash that React Router does not want. */}
+        <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, '')}>
           <Routes>
             {/* Auth / Onboarding */}
             <Route path="/"               element={<SplashScreen />} />

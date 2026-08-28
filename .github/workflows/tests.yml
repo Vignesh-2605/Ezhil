@@ -88,11 +88,29 @@ jobs:
         if: failure()
         run: tail -100 /tmp/backend.log || true
 
+      # The run summary lists artifacts for download, and a JSON file is not
+      # something a reviewer can open. build-report.js skips suite files that
+      # are absent, so running it here with only this job's results produces a
+      # workbook for this suite alone. npm ci is conditional because not every
+      # job installs the test deps for its own sake.
+      - name: Build this suite's workbook
+        if: always()
+        working-directory: ezhil-tests
+        run: |
+          [ -d node_modules ] || npm ci
+          node reports/build-report.js || true
+          mv reports/execution-report.xlsx reports/web-functional.xlsx 2>/dev/null || true
+          # The aggregate job copies every *.json it finds; a per-suite
+          # execution-report.json would be counted a second time there.
+          rm -f reports/execution-report.json reports/execution-report.html
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: selenium-web-report
-          path: ezhil-tests/reports/web-functional.json
+          path: |
+            ezhil-tests/reports/web-functional.xlsx
+            ezhil-tests/reports/web-functional.json
 
   # ── 2 · Selenium — Website UI & Accessibility ──────────────────────────────
   web-ui-a11y:
@@ -148,11 +166,29 @@ jobs:
           npm ci
           node suites/web-ui-a11y.js
 
+      # The run summary lists artifacts for download, and a JSON file is not
+      # something a reviewer can open. build-report.js skips suite files that
+      # are absent, so running it here with only this job's results produces a
+      # workbook for this suite alone. npm ci is conditional because not every
+      # job installs the test deps for its own sake.
+      - name: Build this suite's workbook
+        if: always()
+        working-directory: ezhil-tests
+        run: |
+          [ -d node_modules ] || npm ci
+          node reports/build-report.js || true
+          mv reports/execution-report.xlsx reports/web-ui-a11y.xlsx 2>/dev/null || true
+          # The aggregate job copies every *.json it finds; a per-suite
+          # execution-report.json would be counted a second time there.
+          rm -f reports/execution-report.json reports/execution-report.html
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: ui-a11y-report
-          path: ezhil-tests/reports/web-ui-a11y.json
+          path: |
+            ezhil-tests/reports/web-ui-a11y.xlsx
+            ezhil-tests/reports/web-ui-a11y.json
 
   # ── 3 · Unit & API ─────────────────────────────────────────────────────────
   api-unit:
@@ -203,11 +239,29 @@ jobs:
           PYTEST_PYTHON: python
         run: node suites/api-contract.js
 
+      # The run summary lists artifacts for download, and a JSON file is not
+      # something a reviewer can open. build-report.js skips suite files that
+      # are absent, so running it here with only this job's results produces a
+      # workbook for this suite alone. npm ci is conditional because not every
+      # job installs the test deps for its own sake.
+      - name: Build this suite's workbook
+        if: always()
+        working-directory: ezhil-tests
+        run: |
+          [ -d node_modules ] || npm ci
+          node reports/build-report.js || true
+          mv reports/execution-report.xlsx reports/api-contract.xlsx 2>/dev/null || true
+          # The aggregate job copies every *.json it finds; a per-suite
+          # execution-report.json would be counted a second time there.
+          rm -f reports/execution-report.json reports/execution-report.html
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: unit-test-report
-          path: ezhil-tests/reports/api-contract.json
+          path: |
+            ezhil-tests/reports/api-contract.xlsx
+            ezhil-tests/reports/api-contract.json
 
   # ── 4 · Android ────────────────────────────────────────────────────────────
   android:
@@ -275,11 +329,28 @@ jobs:
         if: failure()
         run: tail -120 /tmp/appium.log || true
 
+      # The run summary lists artifacts for download, and a JSON file is not
+      # something a reviewer can open. build-report.js skips suite files that
+      # are absent, so running it here with only this job's results produces a
+      # workbook for this suite alone. npm ci is conditional because not every
+      # job installs the test deps for its own sake.
+      - name: Build this suite's workbook
+        if: always()
+        working-directory: ezhil-tests
+        run: |
+          [ -d node_modules ] || npm ci
+          node reports/build-report.js || true
+          mv reports/execution-report.xlsx reports/android.xlsx 2>/dev/null || true
+          # The aggregate job copies every *.json it finds; a per-suite
+          # execution-report.json would be counted a second time there.
+          rm -f reports/execution-report.json reports/execution-report.html
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: appium-android-report
           path: |
+            ezhil-tests/reports/android.xlsx
             ezhil-tests/reports/android-static.json
             ezhil-tests/reports/android-appium.json
 
@@ -345,11 +416,29 @@ jobs:
           npm ci
           node suites/load-matrix.js
 
+      # The run summary lists artifacts for download, and a JSON file is not
+      # something a reviewer can open. build-report.js skips suite files that
+      # are absent, so running it here with only this job's results produces a
+      # workbook for this suite alone. npm ci is conditional because not every
+      # job installs the test deps for its own sake.
+      - name: Build this suite's workbook
+        if: always()
+        working-directory: ezhil-tests
+        run: |
+          [ -d node_modules ] || npm ci
+          node reports/build-report.js || true
+          mv reports/execution-report.xlsx reports/load-matrix.xlsx 2>/dev/null || true
+          # The aggregate job copies every *.json it finds; a per-suite
+          # execution-report.json would be counted a second time there.
+          rm -f reports/execution-report.json reports/execution-report.html
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: load-test-report
-          path: ezhil-tests/reports/load-matrix.json
+          path: |
+            ezhil-tests/reports/load-matrix.xlsx
+            ezhil-tests/reports/load-matrix.json
 
   # ── Compile master report & deploy ─────────────────────────────────────────
   report:
@@ -404,9 +493,20 @@ jobs:
           '
 
       - name: Publish the report into the web bundle
+        env:
+          # Pages serves this repo at https://<user>.github.io/Ezhil/, so the
+          # bundle must reference /Ezhil/assets/… . Built with the default base
+          # every asset 404s and the site renders as a blank white page.
+          VITE_BASE: /${{ github.event.repository.name }}/
         run: |
           npm --prefix ezhil-web ci
           npm --prefix ezhil-web run build
+          # Pages has no SPA rewrite. A deep link, or any refresh away from the
+          # root, asks for a path with no file behind it and gets the 404 page —
+          # serving index.html there hands the route back to the router.
+          cp ezhil-web/dist/index.html ezhil-web/dist/404.html
+          # Jekyll would otherwise drop Vite's _-prefixed output.
+          touch ezhil-web/dist/.nojekyll
           mkdir -p ezhil-web/dist/reports/latest
           mkdir -p "ezhil-web/dist/reports/history/build-${{ github.run_number }}"
           cp ezhil-tests/reports/execution-report.html ezhil-web/dist/reports/latest/index.html

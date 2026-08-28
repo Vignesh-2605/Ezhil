@@ -1,5 +1,5 @@
-import React, { useState, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { apiFetch } from '../../services/apiClient';
 import {
   aggregate,
@@ -30,6 +30,66 @@ interface LessonContent {
   questions:  QuizItem[];
 }
 interface GenerateResponse { lesson_id: string; lesson: LessonContent; cache_hit: boolean; }
+
+/** A stored lesson row, as the library endpoint returns it. */
+interface StoredLesson {
+  id: string;
+  title: string;
+  content_json: string;
+  language?: string;
+  is_published?: boolean;
+}
+
+/**
+ * Inverse of `toContentJson` — turns a stored lesson back into the shape the
+ * Studio edits.
+ *
+ * Tolerant on purpose. Rows in the database were written by several different
+ * generations of the generator: some carry `quiz`, others `questions`; some
+ * store the passage as `{lines: []}`, others as a plain string; vocabulary
+ * meanings appear as `meaning_en`, `meaning_ta` or `meaning`. Anything that
+ * cannot be read falls back to empty rather than throwing, so a malformed row
+ * opens as an editable skeleton instead of a blank wizard.
+ */
+function fromContentJson(row: StoredLesson): LessonContent {
+  let raw: any = {};
+  try {
+    raw = typeof row.content_json === 'string' ? JSON.parse(row.content_json) : (row.content_json ?? {});
+  } catch {
+    raw = {};
+  }
+
+  const p = raw.passage;
+  const passage = Array.isArray(p?.lines) ? p.lines.join('\n')
+                : typeof p === 'string'   ? p
+                : Array.isArray(raw.lines) ? raw.lines.join('\n')
+                : '';
+
+  const vocabulary: Vocab[] = (Array.isArray(raw.vocabulary) ? raw.vocabulary : [])
+    .map((v: any) => ({
+      word:    String(v?.word ?? ''),
+      meaning: String(v?.meaning_en ?? v?.meaning ?? v?.meaning_ta ?? ''),
+    }))
+    .filter((v: Vocab) => v.word);
+
+  const quizSrc = Array.isArray(raw.quiz) ? raw.quiz
+                : Array.isArray(raw.questions) ? raw.questions
+                : [];
+  const questions: QuizItem[] = quizSrc
+    .map((q: any) => ({
+      q:       String(q?.question_ta ?? q?.question_en ?? q?.q ?? ''),
+      options: (Array.isArray(q?.options_ta) ? q.options_ta
+              : Array.isArray(q?.options_en) ? q.options_en
+              : Array.isArray(q?.options)    ? q.options
+              : []).map((o: any) => String(o)),
+      answer:  Number.isInteger(q?.correct_index) ? q.correct_index
+             : Number.isInteger(q?.answer)        ? q.answer
+             : 0,
+    }))
+    .filter((q: QuizItem) => q.q);
+
+  return { title: String(raw.title ?? row.title ?? ''), passage, vocabulary, questions };
+}
 
 const STEPS: Step[] = ['upload', 'extracting', 'generating', 'preview'];
 
@@ -288,6 +348,72 @@ export const LessonStudio: React.FC = () => {
   const [devLogs, setDevLogs] = useState<string | null>(null);
   const [showDevLogs, setShowDevLogs] = useState(false);
   const [activeSectionIdx, setActiveSectionIdx] = useState<number | null>(0);
+
+  // Opening an existing lesson. The library's Edit button has always linked to
+  // `?edit=<id>`, but nothing here read it, so Edit landed on a blank upload
+  // wizard and there was no way to view or change a lesson once it was made.
+  //
+  // There is no GET /lessons/{id}; the list endpoint is what the library
+  // itself uses, so the row is picked out of that rather than adding a route.
+  const [searchParams] = useSearchParams();
+  const editId = searchParams.get('edit');
+  const [loadingExisting, setLoadingExisting] = useState<boolean>(!!editId);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!editId) return;
+    let cancelled = false;
+
+    (async () => {
+      setLoadingExisting(true);
+      setLoadError(null);
+      try {
+        const rows = await apiFetch<StoredLesson[]>('/api/v1/lessons');
+        if (cancelled) return;
+        const row = (rows ?? []).find(r => r.id === editId);
+        if (!row) {
+          setLoadError('That lesson no longer exists. It may have been deleted.');
+          return;
+        }
+        setLesson(fromContentJson(row));
+        setLessonId(row.id);
+        if (row.language === 'english' || row.language === 'tamil') setDocLanguage(row.language);
+        setStep('preview');
+      } catch (e: any) {
+        if (!cancelled) setLoadError(e?.message || 'Could not load the lesson.');
+      } finally {
+        if (!cancelled) setLoadingExisting(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [editId]);
+
+  // The Studio had no way in except an external link, so a teacher who did not
+  // already know the library was the entry point had no path from here to
+  // their own work. This lists their lessons on the upload step; picking one
+  // just sets ?edit=, which the loader above already handles.
+  const [existing, setExisting] = useState<StoredLesson[] | null>(null);
+
+  useEffect(() => {
+    if (editId) return;               // already opening one
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await apiFetch<StoredLesson[]>('/api/v1/lessons');
+        if (cancelled) return;
+        // Published first, then newest — what a teacher is most likely to want.
+        const sorted = [...(rows ?? [])].sort((a, b) => {
+          const pub = Number(!!b.is_published) - Number(!!a.is_published);
+          return pub !== 0 ? pub : String(b.id).localeCompare(String(a.id));
+        });
+        setExisting(sorted);
+      } catch {
+        setExisting([]);              // a failed list must not block uploading
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [editId]);
 
   const updateResult = useCallback((idx: number, patch: Partial<FileResult>) => {
     setFileResults(prev => {
@@ -610,9 +736,57 @@ export const LessonStudio: React.FC = () => {
       )}
 
       {/* ── Step: Upload ── */}
-      {step === 'upload' && (
+      {loadingExisting && (
+        <div className="glass-panel r-hero p-8 flex flex-col items-center justify-center gap-3 animate-fade-in">
+          <span className="material-symbols-outlined text-3xl text-primary-fixed animate-spin">progress_activity</span>
+          <p className="text-sm text-text-muted">Opening lesson / பாடத்தைத் திறக்கிறது…</p>
+        </div>
+      )}
+
+      {loadError && (
+        <div className="glass-panel r-hero p-8 flex flex-col items-center justify-center gap-3 animate-fade-in">
+          <span className="material-symbols-outlined text-3xl text-error">error</span>
+          <p className="text-sm text-white font-bold">{loadError}</p>
+          <button
+            onClick={() => navigate('/teacher/lessons')}
+            className="mt-2 px-5 py-2.5 bg-primary-fixed text-bg-deep r-chip font-bold text-sm"
+          >
+            Back to Library
+          </button>
+        </div>
+      )}
+
+      {step === 'upload' && !loadingExisting && !loadError && (
         <div className="glass-panel r-hero p-6 md:p-8 space-y-6 relative overflow-hidden animate-fade-in">
           <div className="orb w-72 h-72 bg-studio-purple/10 top-[-4rem] right-[-3rem]" />
+
+          {/* Open an existing lesson. Only rendered when there is something to
+              open, so a first-time teacher sees the plain upload flow. */}
+          {existing && existing.length > 0 && (
+            <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-black/20 r-card border border-white/10">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-text-muted text-lg">folder_open</span>
+                <span className="text-sm font-semibold text-text-primary">
+                  Open existing lesson / பாடத்தைத் திற
+                </span>
+              </div>
+              <select
+                aria-label="Open an existing lesson"
+                defaultValue=""
+                onChange={e => { if (e.target.value) navigate(`/teacher/lesson-studio?edit=${e.target.value}`); }}
+                className="w-full sm:w-72 bg-surface-container-high border border-white/10 text-xs font-bold text-white px-3 py-2 r-chip cursor-pointer outline-none focus:ring-2 focus:ring-primary-fixed"
+              >
+                <option value="" className="bg-surface-container-high">
+                  {existing.length} saved · choose one…
+                </option>
+                {existing.map(l => (
+                  <option key={l.id} value={l.id} className="bg-surface-container-high">
+                    {l.is_published ? '● ' : '○ '}{(l.title || 'Untitled').slice(0, 52)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Language Selector */}
           <div className="relative flex flex-row items-center justify-between gap-4 p-3 bg-black/20 r-card border border-white/10">

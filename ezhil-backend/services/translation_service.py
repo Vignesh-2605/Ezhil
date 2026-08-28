@@ -149,6 +149,39 @@ def fallback_translate_en_to_ta(text: str) -> str:
             
     return " ".join(translated_words)
 
+def _tamil_headword(meaning_ta: str) -> str:
+    """
+    The Tamil term an entry defines, without its English gloss or description.
+
+    Entries are written as "திட்டம் (Project) - ஒரு குறிப்பிட்ட இலக்கை …", so
+    everything from the bracket or the dash onward is prose about the term
+    rather than the term itself.
+    """
+    head = meaning_ta.split("(")[0]
+    head = re.split(r"\s[-–—]\s", head)[0]
+    return head.strip()
+
+
+def _matches_tamil_gloss(word: str, meaning_ta: str) -> bool:
+    """
+    True when `word` IS the Tamil term this entry defines.
+
+    Compares against the entry's headword rather than its whole description.
+    The substring test this replaced matched any word occurring anywhere in the
+    prose — "ஒரு" appears inside project's description, so every "ஒரு" in a
+    lesson was rendered as "project".
+
+    This is deliberately stricter than what it replaced, so inflected forms now
+    fall through untranslated. A Tamil word left as Tamil is a visibly missing
+    translation; a Tamil word confidently replaced by an unrelated English one
+    reads as a real definition and is worse.
+    """
+    head = _tamil_headword(meaning_ta)
+    if not head:
+        return False
+    return word == head or word in head.split()
+
+
 def fallback_translate_ta_to_en(text: str) -> str:
     """Robust dictionary-based fallback for Tamil to English translation."""
     from services.slm_service import DEFAULT_TRANSLATIONS, DICT_MAPPINGS
@@ -168,20 +201,26 @@ def fallback_translate_ta_to_en(text: str) -> str:
     words = clean_text.split()
     translated_words = []
     for w in words:
-        clean_w = w.strip(".,!?\"'()[]{}<>:;।")
+        clean_w = w.strip(".,!?\"'()[]{}<>:;।-–—")
         found = False
-        for eng_word, info in DICT_MAPPINGS.items():
-            if clean_w in info["meaning_ta"]:
-                prefix = re.match(r"^[.,!?\"'()]+", w)
-                suffix = re.search(r"[.,!?\"'()]+$", w)
-                pfx = prefix.group(0) if prefix else ""
-                sfx = suffix.group(0) if suffix else ""
-                translated_words.append(pfx + eng_word + sfx)
-                found = True
-                break
+
+        # A token that is nothing but punctuation must be left alone. It used
+        # to reach the loop below as "", and `"" in anything` is True, so every
+        # stray hyphen matched the first dictionary entry and was rendered as
+        # its headword — this is where "machine" came from.
+        if clean_w:
+            for eng_word, info in DICT_MAPPINGS.items():
+                if _matches_tamil_gloss(clean_w, info["meaning_ta"]):
+                    prefix = re.match(r"^[.,!?\"'()]+", w)
+                    suffix = re.search(r"[.,!?\"'()]+$", w)
+                    pfx = prefix.group(0) if prefix else ""
+                    sfx = suffix.group(0) if suffix else ""
+                    translated_words.append(pfx + eng_word + sfx)
+                    found = True
+                    break
         if not found:
             translated_words.append(w)
-            
+
     return " ".join(translated_words)
 
 def translate_en_to_ta(text: str) -> str:

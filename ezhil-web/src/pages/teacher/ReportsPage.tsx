@@ -3,15 +3,75 @@ import { useNavigate } from 'react-router-dom';
 import { db } from '../../db/db';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { useApiQuery } from '../../hooks/useApi';
 import { IdDisplay } from '../../components/ui/IdDisplay';
+
+/** The teacher dashboard payload. Only the lesson count is used here. */
+interface TeacherDashData { lessons_published: number; }
+
+/** Selectable reporting windows. `days: null` means no date filtering. */
+const DATE_RANGES = [
+  { key: 'all', label: 'All time / எல்லா காலமும்', days: null },
+  { key: '7',   label: 'Last 7 days',              days: 7    },
+  { key: '30',  label: 'Last 30 days',             days: 30   },
+  { key: '90',  label: 'Last 90 days',             days: 90   },
+] as const;
+
+/**
+ * Risk bands for the per-metric distribution bars.
+ *
+ * `phoneme` and `syllable` reproduce cut-offs already used elsewhere in the
+ * product, so the same assessment is banded identically wherever it is shown:
+ *   - phoneme 0.40 / 0.20 — StudentDetailScreen.kt:308-309
+ *   - syllable 0.30       — screeningHeuristic.ts:73 (the syllable_skip tag)
+ *
+ * The two marked PROVISIONAL have no established cut-off anywhere in the
+ * codebase. They are a starting point for a clinician to correct, not a
+ * validated instrument — change them here and every bar follows.
+ */
+const RISK_BANDS = {
+  // Higher error rate is worse.
+  phoneme:  { high: 0.40, medium: 0.20 },
+  // Higher skip rate is worse. `medium` is PROVISIONAL.
+  syllable: { high: 0.30, medium: 0.15 },
+  // Lower words-per-minute is worse. Both values are PROVISIONAL.
+  wpm:      { high: 30,   medium: 60   },
+};
+
+type Band = { high: number; medium: number; low: number; total: number };
+
+const emptyBand = (): Band => ({ high: 0, medium: 0, low: 0, total: 0 });
+
+/** Bucket one reading into a band. `lowerIsWorse` inverts the comparison. */
+const addToBand = (band: Band, value: number | undefined, cuts: { high: number; medium: number }, lowerIsWorse = false) => {
+  if (value === undefined || value === null || Number.isNaN(value)) return;
+  const worseThan = (cut: number) => (lowerIsWorse ? value < cut : value > cut);
+  if (worseThan(cuts.high)) band.high += 1;
+  else if (worseThan(cuts.medium)) band.medium += 1;
+  else band.low += 1;
+  band.total += 1;
+};
 
 export const ReportsPage: React.FC = () => {
   const navigate = useNavigate();
   const { session } = useAuth();
   const teacherId = session?.userId || '';
 
-  const [dateRange] = useState('Oct 01, 2023 - Oct 31, 2023');
+  const [rangeKey, setRangeKey] = useState<string>('all');
   const [grade] = useState('Grade 4-B');
+
+  const activeRange = DATE_RANGES.find(r => r.key === rangeKey) ?? DATE_RANGES[0];
+
+  // Lesson counts come from the server when it answers, exactly as the
+  // dashboard does (`data ?? localStats`). This page used to read only the
+  // local Dexie table, so the dashboard could say "2 Lessons live" while
+  // Reports said "0 Lessons Published" on the same data — the server had the
+  // lessons and this browser had never pulled them.
+  //
+  // Local remains the offline fallback. The sync pull only sends *published*
+  // lessons for this teacher, so the local table is already the right shape
+  // to count; it is just often emptier than the server.
+  const { data: serverDash } = useApiQuery<TeacherDashData>('/api/v1/dashboard/teacher');
 
   /** RFC 4180 quoting: double the quotes, wrap anything with a delimiter. */
   const csvCell = (v: unknown) => {
@@ -49,15 +109,35 @@ export const ReportsPage: React.FC = () => {
     const lowRisk = studentsList.filter(s => s.riskLevel === 'low').length;
     const unscreened = studentsList.filter(s => s.riskLevel === 'unscreened').length;
 
-    // Total assessments count
-    const totalScreenings = await db.assessments
+    // Assessments in the selected window. Fetched rather than counted, because
+    // the per-metric distribution bars below are computed from the same rows —
+    // one pass, and the bars can never disagree with the count above them.
+    const cutoff = activeRange.days === null
+      ? null
+      : new Date(Date.now() - activeRange.days * 86_400_000).toISOString();
+
+    const assessmentsInRange = (await db.assessments
       .where('studentId')
       .anyOf(studentIds)
-      .count();
+      .toArray()
+    ).filter(a => cutoff === null || (a.conductedAt ?? '') >= cutoff);
 
-    // Lessons published count
+    const totalScreenings = assessmentsInRange.length;
+
+    // Real distributions, replacing what used to be three hardcoded bars.
+    const phonemeBand  = emptyBand();
+    const wpmBand      = emptyBand();
+    const syllableBand = emptyBand();
+
+    for (const a of assessmentsInRange) {
+      addToBand(phonemeBand,  a.phonemeErrorRate,  RISK_BANDS.phoneme);
+      addToBand(syllableBand, a.syllableSkipRate,  RISK_BANDS.syllable);
+      addToBand(wpmBand,      a.readingSpeedWpm,   RISK_BANDS.wpm, true);
+    }
+
+    // Offline fallback only — the server figure is preferred below.
     const lessonsList = await db.lessons.toArray();
-    const lessonsPublished = lessonsList.filter(l => l.isPublished).length;
+    const lessonsPublishedLocal = lessonsList.filter(l => l.isPublished).length;
 
     // Map student list details for reports table
     const tableRows = [];
@@ -100,10 +180,13 @@ export const ReportsPage: React.FC = () => {
       lowRisk,
       unscreened,
       totalScreenings,
-      lessonsPublished,
-      tableRows
+      lessonsPublishedLocal,
+      tableRows,
+      phonemeBand,
+      wpmBand,
+      syllableBand
     };
-  }, [teacherId]);
+  }, [teacherId, rangeKey]);
 
   if (!reportsData) {
     return (
@@ -120,15 +203,38 @@ export const ReportsPage: React.FC = () => {
     lowRisk,
     unscreened,
     totalScreenings,
-    lessonsPublished,
-    tableRows
+    lessonsPublishedLocal,
+    tableRows,
+    phonemeBand,
+    wpmBand,
+    syllableBand
   } = reportsData;
+
+  // Server wins when it answers; local covers the offline case.
+  const lessonsPublished = serverDash?.lessons_published ?? lessonsPublishedLocal;
 
   // Calculate percentages for stacked progress bar
   const totalScreened = highRisk + mediumRisk + lowRisk;
   const highPct = totalScreened > 0 ? Math.round((highRisk / totalScreened) * 100) : 0;
   const medPct = totalScreened > 0 ? Math.round((mediumRisk / totalScreened) * 100) : 0;
   const lowPct = totalScreened > 0 ? 100 - highPct - medPct : 0;
+
+  // The three per-metric bars. Each reports how many assessments in the
+  // selected window it could actually band — a reading is skipped when the
+  // metric is absent, so `band.total` is per-metric rather than per-student.
+  const metricRows = [
+    { label: 'Phonemic Awareness / ஒலிப்பு விழிப்புணர்வு', band: phonemeBand  },
+    { label: 'Decoding Speed / குறிவிலக்க வேகம்',           band: wpmBand      },
+    { label: 'Reading Fluency / வாசிப்பு சரளம்',            band: syllableBand },
+  ];
+
+  /** Whole percentages that always sum to 100, so the bar never under-fills. */
+  const bandPercents = (b: Band) => {
+    if (b.total === 0) return { high: 0, medium: 0, low: 0 };
+    const high = Math.round((b.high / b.total) * 100);
+    const medium = Math.round((b.medium / b.total) * 100);
+    return { high, medium, low: 100 - high - medium };
+  };
 
   return (
     <div className="space-y-lg animate-fade-in font-body-tamil select-none">
@@ -148,11 +254,22 @@ export const ReportsPage: React.FC = () => {
       <div className="flex flex-wrap items-center justify-between gap-md bg-surface-container-low/50 p-md r-chip border border-outline-variant/10">
         <div className="flex items-center gap-md flex-wrap">
           <div className="flex flex-col gap-xs">
-            <label className="text-xs uppercase font-boldr text-on-surface-variant">Date Range / தேதி வரம்பு</label>
-            <div className="flex items-center bg-surface-container-high border border-outline-variant/30 px-md py-2 r-chip hover:bg-surface-variant transition-colors cursor-pointer">
+            <label htmlFor="report-range" className="text-xs uppercase font-boldr text-on-surface-variant">Date Range / தேதி வரம்பு</label>
+            <div className="flex items-center bg-surface-container-high border border-outline-variant/30 px-md py-2 r-chip hover:bg-surface-variant transition-colors focus-within:ring-2 focus-within:ring-primary-fixed">
               <span className="material-symbols-outlined text-base text-primary-fixed mr-sm">calendar_month</span>
-              <span className="text-xs font-bold text-white">{dateRange}</span>
-              <span className="material-symbols-outlined text-base text-text-muted ml-lg">expand_more</span>
+              <select
+                id="report-range"
+                value={rangeKey}
+                onChange={e => setRangeKey(e.target.value)}
+                className="text-xs font-bold text-white bg-transparent border-0 outline-none cursor-pointer pr-md appearance-none"
+              >
+                {DATE_RANGES.map(r => (
+                  <option key={r.key} value={r.key} className="bg-surface-container-high text-white">
+                    {r.label}
+                  </option>
+                ))}
+              </select>
+              <span className="material-symbols-outlined text-base text-text-muted -ml-md pointer-events-none">expand_more</span>
             </div>
           </div>
 
@@ -188,8 +305,7 @@ export const ReportsPage: React.FC = () => {
             </p>
             <h3 className="text-display-md font-display-md text-white font-bold leading-none mt-xs">{totalScreenings}</h3>
             <div className="mt-md flex items-center gap-sm text-xs">
-              <span className="text-success font-bold">+12%</span>
-              <span className="text-on-surface-variant font-medium">from last month</span>
+              <span className="text-on-surface-variant font-medium">{activeRange.label}</span>
             </div>
           </div>
         </div>
@@ -204,8 +320,9 @@ export const ReportsPage: React.FC = () => {
             </p>
             <h3 className="text-display-md font-display-md text-white font-bold leading-none mt-xs">{lessonsPublished}</h3>
             <div className="mt-md flex items-center gap-sm text-xs">
-              <span className="text-success font-bold">+4</span>
-              <span className="text-on-surface-variant font-medium">active modules</span>
+              <span className="text-on-surface-variant font-medium">
+                {lessonsPublished === 1 ? 'active module' : 'active modules'}
+              </span>
             </div>
           </div>
         </div>
@@ -254,46 +371,55 @@ export const ReportsPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="space-y-lg">
-          {/* Metric 1 */}
-          <div className="space-y-1">
-            <div className="flex justify-between items-end text-xs">
-              <span className="font-bold text-white">Phonemic Awareness / ஒலிப்பு விழிப்புணர்வு</span>
-              <span className="text-text-muted font-mono">{totalStudents} Students Total</span>
-            </div>
-            <div className="w-full h-8 bg-surface-container flex r-chip overflow-hidden border border-outline-variant/30 shadow-inner">
-              <div className="h-full bg-risk-high flex items-center justify-center text-xs font-bold text-white hover:brightness-110 transition-all cursor-help" style={{ width: '15%' }} title="High Risk">15%</div>
-              <div className="h-full bg-risk-medium flex items-center justify-center text-xs font-bold text-white hover:brightness-110 transition-all cursor-help" style={{ width: '25%' }} title="Medium Risk">25%</div>
-              <div className="h-full bg-risk-low flex items-center justify-center text-xs font-bold text-white hover:brightness-110 transition-all cursor-help" style={{ width: '60%' }} title="Low Risk">60%</div>
-            </div>
+        {totalScreenings === 0 ? (
+          <div className="py-xl text-center">
+            <span className="material-symbols-outlined text-4xl text-text-muted/50">bar_chart_4_bars</span>
+            <p className="text-sm text-text-muted mt-sm">
+              No screenings in this period / இந்தக் காலத்தில் மதிப்பீடுகள் இல்லை
+            </p>
+            <p className="text-xs text-text-muted/70 mt-1">
+              {activeRange.days === null
+                ? 'Risk metrics appear here once students have been screened.'
+                : 'Try a wider date range, or screen a student to see risk metrics here.'}
+            </p>
           </div>
-
-          {/* Metric 2 */}
-          <div className="space-y-1">
-            <div className="flex justify-between items-end text-xs">
-              <span className="font-bold text-white">Decoding Speed / குறிவிலக்க வேகம்</span>
-              <span className="text-text-muted font-mono">{totalStudents} Students Total</span>
-            </div>
-            <div className="w-full h-8 bg-surface-container flex r-chip overflow-hidden border border-outline-variant/30 shadow-inner">
-              <div className="h-full bg-risk-high flex items-center justify-center text-xs font-bold text-white hover:brightness-110 transition-all cursor-help" style={{ width: '30%' }} title="High Risk">30%</div>
-              <div className="h-full bg-risk-medium flex items-center justify-center text-xs font-bold text-white hover:brightness-110 transition-all cursor-help" style={{ width: '20%' }} title="Medium Risk">20%</div>
-              <div className="h-full bg-risk-low flex items-center justify-center text-xs font-bold text-white hover:brightness-110 transition-all cursor-help" style={{ width: '50%' }} title="Low Risk">50%</div>
-            </div>
+        ) : (
+          <div className="space-y-lg">
+            {metricRows.map(({ label, band }) => {
+              const pct = bandPercents(band);
+              return (
+                <div key={label} className="space-y-1">
+                  <div className="flex justify-between items-end text-xs">
+                    <span className="font-bold text-white">{label}</span>
+                    <span className="text-text-muted font-mono">
+                      {band.total} {band.total === 1 ? 'Reading' : 'Readings'}
+                    </span>
+                  </div>
+                  {band.total === 0 ? (
+                    <div className="w-full h-8 bg-surface-container flex items-center justify-center r-chip border border-outline-variant/30 shadow-inner">
+                      <span className="text-xs text-text-muted italic">Not recorded for these screenings</span>
+                    </div>
+                  ) : (
+                    <div className="w-full h-8 bg-surface-container flex r-chip overflow-hidden border border-outline-variant/30 shadow-inner">
+                      {pct.high > 0 && (
+                        <div className="h-full bg-risk-high flex items-center justify-center text-xs font-bold text-white hover:brightness-110 transition-all cursor-help"
+                             style={{ width: `${pct.high}%` }} title={`High risk — ${band.high} of ${band.total}`}>{pct.high}%</div>
+                      )}
+                      {pct.medium > 0 && (
+                        <div className="h-full bg-risk-medium flex items-center justify-center text-xs font-bold text-white hover:brightness-110 transition-all cursor-help"
+                             style={{ width: `${pct.medium}%` }} title={`Medium risk — ${band.medium} of ${band.total}`}>{pct.medium}%</div>
+                      )}
+                      {pct.low > 0 && (
+                        <div className="h-full bg-risk-low flex items-center justify-center text-xs font-bold text-white hover:brightness-110 transition-all cursor-help"
+                             style={{ width: `${pct.low}%` }} title={`Low risk — ${band.low} of ${band.total}`}>{pct.low}%</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
-
-          {/* Metric 3 */}
-          <div className="space-y-1">
-            <div className="flex justify-between items-end text-xs">
-              <span className="font-bold text-white">Reading Fluency / வாசிப்பு சரளம்</span>
-              <span className="text-text-muted font-mono">{totalStudents} Students Total</span>
-            </div>
-            <div className="w-full h-8 bg-surface-container flex r-chip overflow-hidden border border-outline-variant/30 shadow-inner">
-              <div className="h-full bg-risk-high flex items-center justify-center text-xs font-bold text-white hover:brightness-110 transition-all cursor-help" style={{ width: '10%' }} title="High Risk">10%</div>
-              <div className="h-full bg-risk-medium flex items-center justify-center text-xs font-bold text-white hover:brightness-110 transition-all cursor-help" style={{ width: '45%' }} title="Medium Risk">45%</div>
-              <div className="h-full bg-risk-low flex items-center justify-center text-xs font-bold text-white hover:brightness-110 transition-all cursor-help" style={{ width: '45%' }} title="Low Risk">45%</div>
-            </div>
-          </div>
-        </div>
+        )}
       </section>
 
       {/* Detailed Student Reports Table */}

@@ -90,6 +90,49 @@ def _row_student_id(model_cls, clean: dict[str, Any], existing) -> str | None:
     return clean.get("student_id")
 
 
+async def _refresh_risk_levels(db: AsyncSession, student_ids: set[str]) -> int:
+    """
+    Recompute `students.risk_level` from each student's newest assessment.
+
+    `risk_level` is denormalised onto the student row because both dashboards
+    read it directly, but nothing on the server ever derived it — it was
+    whatever the last client happened to push. Android updates the field
+    locally after a screening without marking the row dirty, so the value never
+    left the handset: the phone showed "low" while the server, and therefore
+    the web app, still said "unscreened" (see StudentDao.updateRiskLevel).
+
+    Deriving it here makes the server the single source of truth, so every
+    client converges on the same answer regardless of what it remembered to
+    push, and rows already stranded are repaired the next time an assessment
+    for that student is pushed.
+    """
+    if not student_ids:
+        return 0
+
+    updated = 0
+    for sid in student_ids:
+        latest = (
+            await db.execute(
+                select(Assessment.risk_level)
+                .where(Assessment.student_id == sid)
+                .order_by(Assessment.conducted_at.desc())
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+
+        # No assessments left (all deleted) is a real state — "unscreened" —
+        # but a NULL risk on an existing assessment is not something to act on.
+        if latest is None:
+            continue
+
+        student = await db.get(Student, sid)
+        if student is not None and student.risk_level != latest:
+            student.risk_level = latest
+            updated += 1
+
+    return updated
+
+
 @router.post("/push", response_model=SyncPushResponse)
 async def sync_push(
     req: SyncPushRequest,
@@ -103,6 +146,7 @@ async def sync_push(
     owned = await _owned_student_ids(db, user)
     accepted = 0
     conflicts: list[str] = []
+    touched_students: set[str] = set()
 
     for row in req.rows:
         clean = _coerce_row(model_cls, row)
@@ -149,7 +193,17 @@ async def sync_push(
             db.add(model_cls(**clean))
         accepted += 1
 
+        if model_cls is Assessment:
+            sid = _row_student_id(model_cls, clean, existing)
+            if sid:
+                touched_students.add(sid)
+
+    # After the assessments are in the session, so the newest one is visible.
     await db.flush()
+    if touched_students:
+        await _refresh_risk_levels(db, touched_students)
+        await db.flush()
+
     return SyncPushResponse(accepted=accepted, conflicts=conflicts)
 
 

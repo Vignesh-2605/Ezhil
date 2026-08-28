@@ -46,7 +46,20 @@ interface StudentDao {
     @Query("DELETE FROM students WHERE syncStatus = 'conflict'")
     suspend fun deleteConflicts()
 
-    @Query("UPDATE students SET riskLevel = :riskLevel WHERE id = :id")
+    // Marking the row pending is not incidental — push() only sends
+    // getPending() rows, so without it a screening result stayed on the
+    // handset forever. The phone showed the new risk while the server, and so
+    // the web app, kept the old one; worse, the next pull overwrote the
+    // correct local value with the stale server one, losing the result.
+    // 'conflict' is left alone so a rejected row is not silently retried.
+    @Query(
+        """
+        UPDATE students
+           SET riskLevel  = :riskLevel,
+               syncStatus = CASE WHEN syncStatus = 'conflict' THEN 'conflict' ELSE 'pending' END
+         WHERE id = :id
+        """
+    )
     suspend fun updateRiskLevel(id: String, riskLevel: String)
 
     @Query("UPDATE students SET streakDays = streakDays + 1, lastActive = :today WHERE id = :id AND (lastActive IS NULL OR lastActive != :today)")
