@@ -22,6 +22,8 @@ const SUITE = 'Load & Deployment';
 
 const LEVELS = (process.env.LOAD_LEVELS || '10,25,50,100').split(',').map(Number);
 const SECONDS = Number(process.env.LOAD_SECONDS || 8);
+/** Discarded traffic sent before the first measured level. See main(). */
+const WARMUP_SECONDS = Number(process.env.LOAD_WARMUP_SECONDS || 3);
 
 /** Read-only endpoints only: a load test must not mutate a child's records. */
 function endpoints(token) {
@@ -206,6 +208,25 @@ async function main() {
   const token = await API.login('teacher');
   const eps = endpoints(token);
   const levels = [];
+
+  // The first measured level hits a backend that has served nothing: cold
+  // connection pool, first-touch imports, nothing warm anywhere. The budget
+  // table tightens as concurrency falls, so the strictest p99 in it (1200ms at
+  // 10 VUs) was being applied to the coldest sample the run ever takes,
+  // because 10 VUs always goes first.
+  //
+  // Run 33146250264 failed exactly there — /dashboard/teacher p99 1331ms and
+  // /auth/student/login p99 1292ms at 10 VUs — while 25 and 50 VUs passed with
+  // far looser budgets. Throughput also rose with load, 228 -> 271 -> 348
+  // req/s, which is backwards for a saturating system and is what measuring
+  // warm-up rather than steady state looks like.
+  //
+  // This primes the server and throws the numbers away. No budget is relaxed;
+  // it stops the first sample being one the budgets were never written for.
+  process.stdout.write('  warm-up … ');
+  const warm = await runLevel(eps, Math.min(...LEVELS), WARMUP_SECONDS);
+  const warmed = warm.endpoints.reduce((a, e) => a + e.requests, 0);
+  console.log(`${warmed} requests, discarded`);
 
   for (const vus of LEVELS) {
     process.stdout.write(`  ${String(vus).padStart(4)} VUs … `);
